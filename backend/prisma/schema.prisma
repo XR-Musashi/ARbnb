@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Property {
+  id           String       @id @default(uuid())
+  hostId       String       @map("host_id")
+  name         String
+  address      String?
+  floorPlanUrl String?      @map("floor_plan_url")
+  modelUrl     String?      @map("model_url")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  annotations  Annotation[]
+  sessions     Session[]
+
+  @@map("properties")
+}
+
+model Annotation {
+  id          String       @id @default(uuid())
+  propertyId  String       @map("property_id")
+  title       String
+  content     String  @default("")
+  // 2D floor plan position (normalised 0–1 relative to floor plan image dimensions)
+  floorX      Float?       @map("floor_x")
+  floorY      Float?       @map("floor_y")
+  // 3D AR world-space position (populated after first guest scan)
+  worldX      Float?       @map("world_x")
+  worldY      Float?       @map("world_y")
+  worldZ      Float?       @map("world_z")
+  // Optional room label for wayfinding graph
+  roomLabel   String?      @map("room_label")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  cloudAnchor CloudAnchor?
+
+  @@map("annotations")
+}
+
+model CloudAnchor {
+  id            String     @id @default(uuid())
+  annotationId  String     @unique @map("annotation_id")
+  cloudAnchorId String     @map("cloud_anchor_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  // Google Cloud Anchors expire after 365 days max; track so we can prompt refresh
+  expiresAt     DateTime?  @map("expires_at")
+  annotation    Annotation @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+
+  @@map("cloud_anchors")
+}
+
+// Guest sessions – scoped to one property, auto-clear on checkout
+model Session {
+  id           String    @id @default(uuid())
+  propertyId   String    @map("property_id")
+  guestToken   String    @unique @map("guest_token")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  expiresAt    DateTime  @map("expires_at")
+  checkedOutAt DateTime? @map("checked_out_at")
+  property     Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}

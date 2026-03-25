@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(cmd /c \"dir D:\\\\Study\\\\XR\\\\ARbnb2 /b /a\")",
+      "Bash(cmd /c \"dir D:\\\\Study\\\\XR\\\\ARbnb2 /b /a /s\")",
+      "Bash(cmd /c \"dir D:\\\\Study\\\\XR\\\\ARbnb2 /b /a /s 2>&1\")",
+      "Bash(powershell -Command:*)",
+      "Bash(cmd /c \"cd /d D:\\\\Study\\\\XR\\\\ARbnb2\\\\backend && npm install 2>&1\")"
+    ]
+  }
+}
