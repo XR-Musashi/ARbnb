@@ -19,16 +19,46 @@ Development machine: **Windows 11**.
 ```
 ARbnb2/
 ├── AR app/           # Unity 6 project (guest mobile app)
-├── backend/          # Node.js REST API + PostgreSQL/PostGIS
+├── backend/          # Node.js REST API + PostgreSQL
 ├── frontend dash/    # React + Three.js host dashboard
+├── docker-compose.yml
 └── ARbnb_Proposal_Musashi-1.pdf
 ```
 
 ---
 
+## Local Development Setup
+
+**Start the database (Docker):**
+```bash
+docker compose up -d       # start Postgres on localhost:5432
+docker compose stop        # pause (data retained)
+docker compose down        # stop (data retained in volume)
+```
+
+Local Postgres credentials: `postgres / postgres`, database: `arbnb`.
+
+**DBeaver connection:** host `localhost`, port `5432`, database `arbnb`, user `postgres`, password `postgres`.
+
+**Start backend:**
+```bash
+cd backend
+npm run dev       # localhost:3000
+```
+
+**Start frontend:**
+```bash
+cd "frontend dash"
+npm run dev       # localhost:5173 (proxies /api → localhost:3000)
+```
+
+**Health check:** `GET http://localhost:3000/health` — returns `{"status":"ok","db":"ok"}` when database is reachable, `{"status":"degraded"}` when not.
+
+---
+
 ## Component 1: AR App (Unity)
 
-**Stack:** Unity 6, AR Foundation 6.4.1, ARCore XR Plugin 6.4.1, URP 17.0, XR Interaction Toolkit 3.4.0, Input System 1.19.0
+**Stack:** Unity 6, AR Foundation 6.4.1, ARCore XR Plugin 6.4.1, URP 17.4.0, XR Interaction Toolkit 3.4.0, Input System 1.19.0
 
 **Key Unity packages** (`AR app/Packages/manifest.json`):
 - `com.unity.xr.arfoundation`: 6.4.1
@@ -38,75 +68,95 @@ ARbnb2/
 - `com.unity.render-pipelines.universal`: 17.4.0
 
 **Scenes:** `AR app/Assets/Scenes/SampleScene.unity` — the single main scene.
-**Template assets:** `AR app/Assets/MobileARTemplateAssets/` — contains existing AR plane detection, object placement prefabs, prompt animations, and UI sprites from the Unity AR Mobile template.
+**ARbnb scripts:** `AR app/Assets/ARbnb/Scripts/` — namespace `ARbnb`.
+**Template assets:** `AR app/Assets/MobileARTemplateAssets/` — AR plane detection, object placement prefabs, prompt animations from the Unity AR Mobile template.
 
 **Build for Android:**
-- Open project in Unity 6, switch platform to Android
-- Build target: ARCore, minimum API 26, target API 35 (S25 Ultra)
-- Scripting backend: IL2CPP, ARM64
-- Use `File > Build Settings > Build And Run` to deploy to S25 Ultra over USB
+- Switch platform to Android, minimum API 26, target API 35
+- Scripting backend: IL2CPP, ARM64 only
+- Bundle ID: `com.musashi.arbnb`
+- `File > Build Settings > Build And Run` to deploy to S25 Ultra over USB
 
-**Adding packages:** Use `Window > Package Manager` inside Unity. Never hand-edit `manifest.json` for version-sensitive AR packages.
+**ARCore Extensions** (Google Cloud Anchors) — add via Package Manager by name: `com.google.ar.core.arfoundation-extensions`
 
-**Project settings to configure (not yet set):**
-- Company Name, Bundle ID (`com.musashi.arbnb`)
-- Android Keystore for release builds
-- ARCore Extensions (Google Cloud Anchors) must be added via UPM scope: `com.google.ar.core.arfoundation-extensions`
+**Unity scripting conventions:**
+- Use `FindAnyObjectByType<T>()` (Unity 6 API — `FindObjectOfType` is deprecated)
+- Prefer `[SerializeField]` + Inspector wiring over runtime `GetComponent`
+- All world-space UI uses TextMeshPro (already in project)
+- URP Performant profile is pre-configured — do not switch pipeline
+
+**Coordinate system note:** Unity is Y-up left-handed. 3D annotation positions stored in the database are in Three.js Y-up right-handed coordinates. When consuming `worldX/Y/Z` from the API in Unity:
+```csharp
+var unityPos = new Vector3(worldX, worldY, -worldZ);
+```
 
 ---
 
 ## Component 2: Backend (Node.js)
 
-**Stack:** Node.js (Express), PostgreSQL + PostGIS, Supabase (auth + realtime WebSocket), Prisma ORM
+**Stack:** Express 4, Prisma 5, PostgreSQL 16, Supabase (auth), multer 2
 
-**Location:** `backend/`
-**Entry point:** `backend/src/index.js`
+**Entry point:** `backend/src/index.js` — server starts immediately, DB connects in background.
 
-**Dev commands:**
+**Commands:**
 ```bash
 cd backend
-npm install
-npm run dev          # starts with nodemon
-npm run db:migrate   # run Prisma migrations
-npm run db:seed      # seed test data
-npm test             # Jest tests
+npm run dev            # nodemon
+npm run db:migrate     # Prisma migrate dev
+npm run db:seed        # seed demo property + annotations
+npm run db:studio      # Prisma Studio GUI
+npm test               # Jest (Supabase auth mocked)
 ```
 
-**Key REST endpoints to implement:**
-- `POST /api/properties` — create property (host)
-- `GET /api/properties/:id/annotations` — fetch all annotations for a property
-- `POST /api/properties/:id/annotations` — create annotation with spatial position
-- `PUT /api/annotations/:id` — update annotation text/position
-- `DELETE /api/annotations/:id` — remove annotation
-- `POST /api/anchors` — store Google Cloud Anchor ID against annotation
+**Implemented REST endpoints:**
+- `GET/POST /api/properties` — list / create (host)
+- `GET/PUT/DELETE /api/properties/:id` — manage property
+- `POST /api/properties/:id/floor-plan` — upload floor plan image (10 MB limit, Supabase Storage)
+- `POST /api/properties/:id/model` — upload 3D model GLB/GLTF (100 MB limit, Supabase Storage)
+- `GET/POST /api/properties/:id/annotations` — list / create annotations
+- `PUT/DELETE /api/annotations/:id` — update / delete annotation
+- `POST/GET /api/anchors` — store / fetch Google Cloud Anchor ID
+- `POST /api/sessions` — host creates guest token for a property
+- `DELETE /api/sessions/:id` — guest checkout
+- `GET /api/sessions/me` — guest validates own token
 
-**Database schema:** PostgreSQL with PostGIS extension. Key tables: `properties`, `annotations` (with `position geometry(PointZ)` for 3D spatial coords), `cloud_anchors`, `sessions`.
+**Auth middleware** (`src/middleware/auth.js`):
+- `requireHost` — verifies Supabase JWT
+- `requireGuest` — verifies our own session token
+- `requireHostOrGuest` — accepts either
 
-**Auth:** Supabase JWT — all host routes require Bearer token. Guest routes use short-lived session tokens scoped to a property.
+**Database schema** (`prisma/schema.prisma`): `Property`, `Annotation`, `CloudAnchor`, `Session`.
+Annotation has both `floorX/floorY` (2D dashboard coords) and `worldX/worldY/worldZ` (3D model coords, metres).
 
 ---
 
 ## Component 3: Frontend Dashboard (React)
 
-**Stack:** React 18, Vite, Three.js (for floor plan 3D viewer), TailwindCSS
+**Stack:** React 18, Vite 8, Three.js r170, TailwindCSS 3, Vitest 3, Supabase JS 2
 
-**Location:** `frontend dash/`
-
-**Dev commands:**
+**Commands:**
 ```bash
 cd "frontend dash"
-npm install
-npm run dev          # Vite dev server on localhost:5173
-npm run build        # Production build
-npm run preview      # Preview production build
-npm test             # Vitest
+npm run dev       # localhost:5173
+npm run build
+npm test
 ```
 
-**Key views to implement:**
-- `/login` — Supabase auth (host login)
-- `/dashboard` — list of properties
-- `/properties/:id/edit` — floor plan upload + annotation pin editor (Three.js canvas)
-- Floor plan editor: upload image → place pins on 2D overlay → each pin has title + text note
+**Routes:** `/login`, `/` (dashboard), `/properties/:id/edit`
+
+**Key components:**
+- `src/pages/PropertyEdit.jsx` — main editor page with 2D/3D tab toggle
+- `src/components/FloorPlanEditor.jsx` — orthographic Three.js canvas; click to place pins (stores `floorX/floorY`, normalised 0–1)
+- `src/components/ModelViewer.jsx` — perspective Three.js canvas; orbit mode + place-pin mode; GLTFLoader with DRACOLoader; stores `worldX/worldY/worldZ` in metres
+- `src/lib/api.js` — typed fetch wrapper for all backend endpoints
+- `src/hooks/useAuth.js` — Supabase auth state
+
+**3D model notes:**
+- Draco decoder WASM files are in `frontend dash/public/draco/` (served statically)
+- Models should be exported in metres scale (GLTF spec default)
+- Blender export: File → Export → glTF 2.0 (.glb), Y-up, metres
+- Annotation list: purple dot = 3D position, pink dot = 2D position
+- Clicking a pin in the list auto-switches to the correct tab (2D/3D)
 
 ---
 
@@ -121,28 +171,19 @@ Guest (Unity AR app) ──► REST API ──► fetch annotations by property
                     └──► Google Cloud Anchors API ──► resolve spatial anchor
 ```
 
-- Annotations are authored with 2D floor-plan coordinates in the dashboard.
-- On first AR walkthrough, the Unity app resolves Google Cloud Anchors and maps annotation positions to real-world 3D space.
-- `ARAnchorManager` handles local anchor lifecycle; `ARCore Extensions` handles cloud sync.
+- Annotations authored in dashboard carry either `floorX/Y` (2D) or `worldX/Y/Z` (3D model coords).
+- On first AR walkthrough, Unity hosts a Google Cloud Anchor and POSTs the `cloudAnchorId` to `/api/anchors`.
+- Subsequent guests resolve the cloud anchor for precise 6DOF placement.
 - Proximity culling: max 3 annotation panels visible simultaneously (distance-sorted).
+- `worldX/Y/Z` from the API must have Z negated before use in Unity (coordinate handedness).
 
 ---
 
 ## Key Architectural Decisions
 
-- **No marker-based tracking** — uses markerless ARCore SLAM exclusively.
-- **Google Cloud Anchors** for cross-session, cross-device persistence (replaces local `ARAnchorManager` persistence after first scan).
-- **LiDAR is enhancement only** — base feature set must work without depth sensor (S25 Ultra has no LiDAR).
-- **URP Performant profile** is pre-configured (`AR app/Assets/Settings/URP-Performant.asset`) — stay on this pipeline, do not switch to HDRP.
-- **Supabase** handles both auth and realtime WebSocket push to Unity (annotation updates while guest is in-app).
-- Annotation data is cached locally in Unity for offline use after first fetch.
-
----
-
-## Unity Scripting Conventions
-
-- All ARbnb C# scripts go in `AR app/Assets/ARbnb/Scripts/`
-- Namespace: `ARbnb`
-- Use `ARFoundation` manager singletons via `FindAnyObjectByType<T>()` (Unity 6 API, not deprecated `FindObjectOfType`)
-- Prefer `SerializeField` + Inspector wiring over `GetComponent` at runtime for prefab references
-- All world-space UI panels use TextMeshPro (already in project via `Assets/TextMesh Pro`)
+- **No marker-based tracking** — markerless ARCore SLAM only.
+- **Google Cloud Anchors** for cross-session persistence; local `ARAnchorManager` used as fallback before cloud anchor is established.
+- **LiDAR is enhancement only** — S25 Ultra has no LiDAR; base features work without depth sensor.
+- **URP Performant profile** pre-configured — do not switch to HDRP.
+- **3D model in dashboard** gives hosts precise 3D annotation placement; coordinates map directly to AR world space after Z-negation.
+- **Supabase Storage** holds floor plan images (bucket: `floor-plans`) and 3D models (same bucket, under `{hostId}/{propertyId}/model.glb`).

@@ -23,6 +23,8 @@ AR app/Logs/
 AR app/UserSettings/
 AR app/obj/
 AR app/Build/
+AR app/Builds/
+AR app/.utmp/
 AR app/*.sln
 AR app/*.csproj
 AR app/**/*.pidb

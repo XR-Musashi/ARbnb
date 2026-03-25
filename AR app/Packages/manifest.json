@@ -7,6 +7,8 @@
     "com.unity.multiplayer.center": "1.0.1",
     "com.unity.render-pipelines.universal": "17.4.0",
     "com.unity.timeline": "1.8.11",
+    "com.google.ar.core.arfoundation.extensions": "https://github.com/google-ar/arcore-unity-extensions.git",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
     "com.unity.xr.arcore": "6.4.1",
     "com.unity.xr.arfoundation": "6.4.1",
     "com.unity.xr.arkit": "6.4.1",
