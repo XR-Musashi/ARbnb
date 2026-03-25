@@ -16,7 +16,7 @@ namespace ARbnb
     public static class ApiClient
     {
         // Set these before use — ARbnbSession sets them on successful login
-        public static string BaseUrl = "http://10.0.2.2:3000"; // 10.0.2.2 = localhost from Android emulator
+        public static string BaseUrl = "http://localhost:3000"; // tunnel via: adb reverse tcp:3000 tcp:3000
         public static string GuestToken = "";
 
         // ── Core HTTP helpers ────────────────────────────────────────────────

@@ -21,7 +21,7 @@ namespace ARbnb
     {
         [Header("Backend")]
         [Tooltip("Base URL of the Node.js API. Use 10.0.2.2:3000 for Android emulator, your machine's LAN IP for a real device.")]
-        [SerializeField] string apiBaseUrl = "http://192.168.1.100:3000";
+        [SerializeField] string apiBaseUrl = "http://localhost:3000";
 
         [Header("Login UI")]
         [SerializeField] GameObject loginCanvas;

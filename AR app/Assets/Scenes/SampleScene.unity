@@ -2006,7 +2006,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e3745c82b6793e4583cd40f77c674be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARbnb.ARbnbSession
-  apiBaseUrl: http://10.6.61.95:3000
+  apiBaseUrl: http://localhost:3000
   loginCanvas: {fileID: 2125344915}
   tokenInputField: {fileID: 526942130}
   connectButton: {fileID: 1733874004}
