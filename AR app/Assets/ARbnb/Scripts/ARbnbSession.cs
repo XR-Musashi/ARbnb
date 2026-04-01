@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.XR.ARFoundation;
 
 namespace ARbnb
 {
@@ -46,6 +48,18 @@ namespace ARbnb
 #if UNITY_EDITOR
             tokenInputField.text = PlayerPrefs.GetString("arbnb_last_token", "");
 #endif
+
+
+            StartCoroutine(LogARSessionState());
+        }
+
+        IEnumerator LogARSessionState()
+        {
+            while (true)
+            {
+                Debug.Log($"[ARbnb] AR Session state: {ARSession.state}, notTracking reason: {ARSession.notTrackingReason}");
+                yield return new WaitForSeconds(2f);
+            }
         }
 
         async void OnConnectClicked()
