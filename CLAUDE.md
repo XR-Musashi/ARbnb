@@ -21,7 +21,6 @@ ARbnb2/
 ├── AR app/           # Unity 6 project (guest mobile app)
 ├── backend/          # Node.js REST API + PostgreSQL
 ├── frontend dash/    # React + Three.js host dashboard
-├── docker-compose.yml
 └── ARbnb_Proposal_Musashi-1.pdf
 ```
 
@@ -29,12 +28,7 @@ ARbnb2/
 
 ## Local Development Setup
 
-**Start the database (Docker):**
-```bash
-docker compose up -d       # start Postgres on localhost:5432
-docker compose stop        # pause (data retained)
-docker compose down        # stop (data retained in volume)
-```
+**Database:** PostgreSQL runs as a local Windows service (not Docker). No docker-compose needed.
 
 Local Postgres credentials: `postgres / postgres`, database: `arbnb`.
 
@@ -43,16 +37,21 @@ Local Postgres credentials: `postgres / postgres`, database: `arbnb`.
 **Start backend:**
 ```bash
 cd backend
-npm run dev       # localhost:3000
+npm run dev       # localhost:3001
 ```
 
 **Start frontend:**
 ```bash
 cd "frontend dash"
-npm run dev       # localhost:5173 (proxies /api → localhost:3000)
+npm run dev       # localhost:5173 (proxies /api → localhost:3001)
 ```
 
-**Health check:** `GET http://localhost:3000/health` — returns `{"status":"ok","db":"ok"}` when database is reachable, `{"status":"degraded"}` when not.
+**ADB reverse tunnel (run after each USB reconnect):**
+```bash
+adb reverse tcp:3001 tcp:3001
+```
+
+**Health check:** `GET http://localhost:3001/health` — returns `{"status":"ok","db":"ok"}` when database is reachable, `{"status":"degraded"}` when not.
 
 ---
 
@@ -69,6 +68,11 @@ npm run dev       # localhost:5173 (proxies /api → localhost:3000)
 
 **Scenes:** `AR app/Assets/Scenes/SampleScene.unity` — the single main scene.
 **ARbnb scripts:** `AR app/Assets/ARbnb/Scripts/` — namespace `ARbnb`.
+- `ARbnbSession.cs` — session token management and API bootstrap
+- `AnnotationManager.cs` — fetches annotations from API, spawns panels, runs `SyncCloudAnchorsAsync` after spawn; has optional `CloudAnchorService` field (raw world positions used if null)
+- `AnnotationPanel.cs` — per-annotation world-space UI panel; `SnapToAnchor(Transform)` parents the panel to a resolved anchor transform
+- `CloudAnchorService.cs` — wraps ARCore Extensions Cloud Anchor API; `HostAnchorAsync(Vector3 worldPos)` and `ResolveAnchorAsync(string cloudAnchorId)`; requires `ARAnchorManager` assigned in Inspector
+
 **Template assets:** `AR app/Assets/MobileARTemplateAssets/` — AR plane detection, object placement prefabs, prompt animations from the Unity AR Mobile template.
 
 **Build for Android:**
@@ -78,6 +82,16 @@ npm run dev       # localhost:5173 (proxies /api → localhost:3000)
 - `File > Build Settings > Build And Run` to deploy to S25 Ultra over USB
 
 **ARCore Extensions** (Google Cloud Anchors) — add via Package Manager by name: `com.google.ar.core.arfoundation-extensions`
+
+**Cloud Anchors Unity Editor setup:**
+- All ARbnb scripts live on a single **ARbnb** GameObject (ARbnbSession, AnnotationManager, WaypointNavigator, DiscoveryHUD, CloudAnchorService)
+- Add `AR Anchor Manager` component to **XR Origin**
+- Add `CloudAnchorService` component to the **ARbnb** GameObject; wire `ARAnchorManager` (on XR Origin) to its Inspector field
+- Wire `CloudAnchorService` to the `AnnotationManager` Inspector field (self-reference on ARbnb GameObject)
+- Add `ARCoreExtensions` component to the **AR Session** GameObject; wire Session, Session Origin (leave blank — AR Foundation 6 incompatibility), Camera Manager
+- Set **Android Authentication Strategy** to `API Key` and paste key in `Edit > Project Settings > XR Plug-in Management > ARCore Extensions`
+- Set **Cloud Anchor Mode** to `Enabled` in the same settings page
+- Note: `ARCoreExtensions.SessionOrigin` field expects the removed `ARSessionOrigin` type — leave it blank; ARCore Extensions finds `XROrigin` automatically at runtime
 
 **Unity scripting conventions:**
 - Use `FindAnyObjectByType<T>()` (Unity 6 API — `FindObjectOfType` is deprecated)
@@ -172,8 +186,10 @@ Guest (Unity AR app) ──► REST API ──► fetch annotations by property
 ```
 
 - Annotations authored in dashboard carry either `floorX/Y` (2D) or `worldX/Y/Z` (3D model coords).
-- On first AR walkthrough, Unity hosts a Google Cloud Anchor and POSTs the `cloudAnchorId` to `/api/anchors`.
-- Subsequent guests resolve the cloud anchor for precise 6DOF placement.
+- Cloud anchor flow (two-phase):
+  - **First guest:** panels appear immediately at raw `worldX/Y/Z`; `CloudAnchorService.HostAnchorAsync` runs in background; resulting `cloudAnchorId` is saved to DB via `POST /api/anchors`.
+  - **Subsequent guests:** panels start at raw positions, then `SnapToAnchor` re-parents each panel to the resolved `ARAnchor` transform once `ResolveAnchorAsync` completes.
+- If `CloudAnchorService` is not wired in the Inspector, `AnnotationManager` skips cloud anchor sync and panels remain at raw positions.
 - Proximity culling: max 3 annotation panels visible simultaneously (distance-sorted).
 - `worldX/Y/Z` from the API must have Z negated before use in Unity (coordinate handedness).
 

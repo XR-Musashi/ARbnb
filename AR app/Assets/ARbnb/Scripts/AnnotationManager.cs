@@ -4,6 +4,7 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
+using System.Threading.Tasks;
 
 namespace ARbnb
 {
@@ -28,6 +29,7 @@ namespace ARbnb
         [Header("Dependents")]
         [SerializeField] WaypointNavigator waypointNavigator;
         [SerializeField] DiscoveryHUD discoveryHUD;
+        [SerializeField] CloudAnchorService cloudAnchorService; // optional — raw positions used if null
 
         [Header("Culling")]
         [SerializeField] int maxVisible = 3;
@@ -70,7 +72,14 @@ namespace ARbnb
                     continue;
                 }
 
-                var panel = Instantiate(annotationPanelPrefab, ann.ToUnityPosition(), Quaternion.identity);
+                var spawnPos = ann.ToUnityPosition();
+                Debug.Log($"[ARbnb] Spawning '{ann.Title}' at {spawnPos}");
+                // TEMP DEBUG: red sphere to confirm world position
+                var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                sphere.transform.position = spawnPos;
+                sphere.transform.localScale = Vector3.one * 0.15f;
+                sphere.GetComponent<Renderer>().material.color = Color.red;
+                var panel = Instantiate(annotationPanelPrefab, spawnPos, Quaternion.identity);
                 panel.Initialise(ann);
                 _panels.Add(panel);
             }
@@ -82,6 +91,62 @@ namespace ARbnb
             var allAnnotations = GetAllAnnotations();
             waypointNavigator?.PopulateDestinations(allAnnotations);
             discoveryHUD?.Initialise(allAnnotations);
+
+            // Kick off cloud anchor sync in background — panels already visible at raw positions
+            if (cloudAnchorService != null)
+                _ = SyncCloudAnchorsAsync(_panels.ToList());
+            else
+                Debug.LogWarning("[ARbnb] CloudAnchorService not assigned — using raw model positions only.");
+        }
+
+        // ── Cloud Anchor sync ────────────────────────────────────────────────
+
+        /// <summary>
+        /// For each panel:
+        ///   - Has cloudAnchorId → resolve it and parent the panel to the live anchor.
+        ///   - No cloudAnchorId  → host a new cloud anchor at its raw position and
+        ///     persist the ID to the backend so future guests can resolve it.
+        /// Panels remain visible at their raw positions while async work runs.
+        /// </summary>
+        async Task SyncCloudAnchorsAsync(List<AnnotationPanel> panels)
+        {
+            foreach (var panel in panels)
+            {
+                if (panel == null) continue;
+                var ann = panel.Data;
+
+                if (!string.IsNullOrEmpty(ann.CloudAnchor?.CloudAnchorId))
+                {
+                    // ── Resolve existing anchor ──────────────────────────────
+                    var anchor = await cloudAnchorService.ResolveAnchorAsync(ann.CloudAnchor.CloudAnchorId);
+                    if (anchor != null && panel != null)
+                        panel.SnapToAnchor(anchor.transform);
+                }
+                else
+                {
+                    // ── Host a new anchor for this annotation ─────────────────
+                    var cloudId = await cloudAnchorService.HostAnchorAsync(ann.ToUnityPosition());
+                    if (cloudId == null) continue;
+
+                    try
+                    {
+                        await ApiClient.PostAnchorAsync(new PostAnchorRequest
+                        {
+                            AnnotationId = ann.Id,
+                            CloudAnchorId = cloudId,
+                            // Store back in Three.js convention (Z not negated)
+                            WorldX = ann.WorldX ?? 0f,
+                            WorldY = ann.WorldY ?? 0f,
+                            WorldZ = ann.WorldZ ?? 0f,
+                        });
+                        Debug.Log($"[ARbnb] Stored cloud anchor for '{ann.Title}'");
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError($"[ARbnb] Failed to store cloud anchor for '{ann.Title}': {e.Message}");
+                    }
+                }
+            }
         }
 
         // ── Proximity culling ────────────────────────────────────────────────

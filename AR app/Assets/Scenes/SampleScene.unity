@@ -315,6 +315,7 @@ GameObject:
   - component: {fileID: 329863538}
   - component: {fileID: 329863537}
   - component: {fileID: 329863536}
+  - component: {fileID: 329863539}
   m_Layer: 0
   m_Name: AR Session
   m_TagString: Untagged
@@ -364,6 +365,23 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &329863539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 329863535}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1b50ad3f5d9024549b0a549c5a03a084, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Google.XR.ARCoreExtensions::Google.XR.ARCoreExtensions.ARCoreExtensions
+  Session: {fileID: 329863537}
+  SessionOrigin: {fileID: 0}
+  CameraManager: {fileID: 331264286}
+  ARCoreExtensionsConfig: {fileID: 11400000, guid: 36ccc968dcdeb9640b597bc94dc55e19, type: 2}
+  CameraConfigFilter: {fileID: 0}
 --- !u!1001 &331264285
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -453,10 +471,24 @@ PrefabInstance:
     - {fileID: 2512387470319625119, guid: 48cb3fb68c91eb94999fd99957eb0cae, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2512387470528047719, guid: 48cb3fb68c91eb94999fd99957eb0cae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 331264290}
     - targetCorrespondingSourceObject: {fileID: 2512387469002778309, guid: 48cb3fb68c91eb94999fd99957eb0cae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 331264288}
   m_SourcePrefab: {fileID: 100100000, guid: 48cb3fb68c91eb94999fd99957eb0cae, type: 3}
+--- !u!114 &331264286 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2512387469002778329, guid: 48cb3fb68c91eb94999fd99957eb0cae, type: 3}
+  m_PrefabInstance: {fileID: 331264285}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 331264287}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4966719baa26e4b0e8231a24d9bd491a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &331264287 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2512387469002778309, guid: 48cb3fb68c91eb94999fd99957eb0cae, type: 3}
@@ -506,6 +538,27 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &331264289 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2512387470528047719, guid: 48cb3fb68c91eb94999fd99957eb0cae, type: 3}
+  m_PrefabInstance: {fileID: 331264285}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &331264290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 331264289}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 728ad7fae8e460a4ba41265c7308d757, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARAnchorManager
+  <trackablesChanged>k__BackingField:
+    m_PersistentCalls:
+      m_Calls: []
+  m_AnchorPrefab: {fileID: 0}
 --- !u!1 &374782151
 GameObject:
   m_ObjectHideFlags: 0
@@ -1110,7 +1163,7 @@ MonoBehaviour:
   m_ScaleFactor: 1
   m_ReferenceResolution: {x: 1080, y: 1920}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
+  m_MatchWidthOrHeight: 0.5
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
@@ -1872,6 +1925,7 @@ GameObject:
   - component: {fileID: 1137103689}
   - component: {fileID: 1137103688}
   - component: {fileID: 1137103687}
+  - component: {fileID: 1137103692}
   m_Layer: 0
   m_Name: ARbnb
   m_TagString: Untagged
@@ -1931,6 +1985,7 @@ MonoBehaviour:
   statusLabel: {fileID: 0}
   waypointNavigator: {fileID: 1137103688}
   discoveryHUD: {fileID: 1137103687}
+  cloudAnchorService: {fileID: 1137103692}
   maxVisible: 3
   cullingInterval: 0.5
 --- !u!114 &1137103690
@@ -1945,7 +2000,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e3745c82b6793e4583cd40f77c674be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARbnb.ARbnbSession
-  apiBaseUrl: http://localhost:3000
+  apiBaseUrl: http://localhost:3001
   loginCanvas: {fileID: 2125344915}
   tokenInputField: {fileID: 526942130}
   connectButton: {fileID: 1733874004}
@@ -1966,6 +2021,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1137103692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1137103686}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ec461776caa584a899afa1f1309a7d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARbnb.CloudAnchorService
+  anchorManager: {fileID: 331264290}
 --- !u!4 &1317047678 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2512387469002778308, guid: 48cb3fb68c91eb94999fd99957eb0cae, type: 3}

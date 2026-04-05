@@ -46,7 +46,7 @@ namespace ARbnb
             // Billboard: always face the camera
             if (_mainCamera != null)
                 transform.rotation = Quaternion.LookRotation(
-                    transform.position - _mainCamera.transform.position);
+                    _mainCamera.transform.position - transform.position);
         }
 
         // ── Public API ───────────────────────────────────────────────────────
@@ -64,8 +64,8 @@ namespace ARbnb
             if (_visible) return;
             _visible = true;
             gameObject.SetActive(true);
-            StopAllCoroutines();
-            StartCoroutine(Fade(1f));
+            _canvasGroup.alpha = 1f;
+            Debug.Log($"[ARbnb] Panel '{name}' shown at world pos {transform.position}, canvas local Z: {GetComponentInChildren<Canvas>()?.transform.localPosition.z}");
         }
 
         public void Hide()
@@ -78,6 +78,16 @@ namespace ARbnb
 
         public float DistanceTo(Vector3 point) =>
             Vector3.Distance(transform.position, point);
+
+        /// <summary>
+        /// Parents this panel to a resolved cloud anchor so ARCore's ongoing pose
+        /// refinement is reflected automatically. Call after ResolveAnchorAsync succeeds.
+        /// </summary>
+        public void SnapToAnchor(Transform anchorTransform)
+        {
+            transform.SetParent(anchorTransform, worldPositionStays: false);
+            transform.localPosition = Vector3.zero;
+        }
 
         // ── Fade helpers ─────────────────────────────────────────────────────
 
