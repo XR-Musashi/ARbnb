@@ -1,38 +1,48 @@
-using System.Collections;
 using TMPro;
 using UnityEngine;
 
 namespace ARbnb
 {
     /// <summary>
-    /// A world-space floating annotation panel.
-    /// Always faces the camera (billboard). Fades in/out when shown or hidden.
+    /// A world-space floating annotation panel built from 3D primitives and
+    /// TextMeshPro (mesh-based, not UGUI) so it reliably renders in URP AR.
     ///
-    /// Prefab structure:
+    /// The panel is built procedurally in Awake — no Canvas required.
+    ///
+    /// Prefab structure (minimal — just this script on root):
     ///   AnnotationPanel (this script)
-    ///     └─ Canvas (World Space, scale ~0.002)
-    ///          ├─ Background  (Image)
-    ///          ├─ TitleText   (TMP_Text)
-    ///          └─ ContentText (TMP_Text)
+    ///
+    /// Optional Inspector overrides for title/content TMP are kept so the prefab
+    /// can still reference hand-crafted TMP children if desired later.
     /// </summary>
-    [RequireComponent(typeof(CanvasGroup))]
     public class AnnotationPanel : MonoBehaviour
     {
-        [SerializeField] TMP_Text titleText;
-        [SerializeField] TMP_Text contentText;
+        // Width / height of the floating card in metres
+        [SerializeField] float cardWidth  = 0.55f;
+        [SerializeField] float cardHeight = 0.25f;
 
-        [SerializeField] float fadeDuration = 0.3f;
+        /// <summary>
+        /// A URP-compatible material for the background quad.
+        /// Create one in the Editor: Assets → Create → Material, set shader to
+        /// "Universal Render Pipeline/Unlit", pick a dark colour, assign here.
+        /// If null the quad will render purple (legacy default material).
+        /// </summary>
+        [SerializeField] Material backgroundMaterial;
 
-        CanvasGroup _canvasGroup;
         Camera _mainCamera;
-        bool _visible = false;
+        bool   _visible = false;
+
+        TextMeshPro _titleTmp;
+        TextMeshPro _contentTmp;
+        GameObject  _background;
 
         public AnnotationData Data { get; private set; }
 
+        // ── Lifecycle ────────────────────────────────────────────────────────
+
         void Awake()
         {
-            _canvasGroup = GetComponent<CanvasGroup>();
-            _canvasGroup.alpha = 0f;
+            BuildCard();
             gameObject.SetActive(false);
         }
 
@@ -43,10 +53,10 @@ namespace ARbnb
 
         void LateUpdate()
         {
-            // Billboard: always face the camera
-            if (_mainCamera != null)
-                transform.rotation = Quaternion.LookRotation(
-                    _mainCamera.transform.position - transform.position);
+            if (_mainCamera == null) return;
+            // Face the camera: panel's local +Z toward camera so Quad/TMP front face is visible
+            transform.rotation = Quaternion.LookRotation(
+                _mainCamera.transform.position - transform.position);
         }
 
         // ── Public API ───────────────────────────────────────────────────────
@@ -54,8 +64,8 @@ namespace ARbnb
         public void Initialise(AnnotationData data)
         {
             Data = data;
-            titleText.text = data.Title;
-            contentText.text = data.Content;
+            if (_titleTmp   != null) _titleTmp.text   = data.Title;
+            if (_contentTmp != null) _contentTmp.text = data.Content;
             name = $"AnnotationPanel_{data.Id}";
         }
 
@@ -64,50 +74,88 @@ namespace ARbnb
             if (_visible) return;
             _visible = true;
             gameObject.SetActive(true);
-            _canvasGroup.alpha = 1f;
-            Debug.Log($"[ARbnb] Panel '{name}' shown at world pos {transform.position}, canvas local Z: {GetComponentInChildren<Canvas>()?.transform.localPosition.z}");
+            Debug.Log($"[ARbnb] Panel '{name}' shown at {transform.position}");
         }
 
         public void Hide()
         {
             if (!_visible) return;
             _visible = false;
-            StopAllCoroutines();
-            StartCoroutine(FadeAndDeactivate());
+            gameObject.SetActive(false);
         }
 
         public float DistanceTo(Vector3 point) =>
             Vector3.Distance(transform.position, point);
 
-        /// <summary>
-        /// Parents this panel to a resolved cloud anchor so ARCore's ongoing pose
-        /// refinement is reflected automatically. Call after ResolveAnchorAsync succeeds.
-        /// </summary>
+        /// <summary>Parents this panel to a resolved cloud anchor.</summary>
         public void SnapToAnchor(Transform anchorTransform)
         {
             transform.SetParent(anchorTransform, worldPositionStays: false);
             transform.localPosition = Vector3.zero;
         }
 
-        // ── Fade helpers ─────────────────────────────────────────────────────
+        // ── Card builder ─────────────────────────────────────────────────────
 
-        IEnumerator Fade(float target)
+        void BuildCard()
         {
-            float start = _canvasGroup.alpha;
-            float elapsed = 0f;
-            while (elapsed < fadeDuration)
+            // --- Background quad -------------------------------------------
+            _background = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            _background.name = "Background";
+            _background.transform.SetParent(transform, worldPositionStays: false);
+            _background.transform.localPosition = Vector3.zero;
+            _background.transform.localScale = new Vector3(cardWidth, cardHeight, 1f);
+
+            // Destroy the collider — annotation panels don't need physics
+            Destroy(_background.GetComponent<MeshCollider>());
+
+            // Second quad facing the opposite direction for double-sided appearance
+            var back = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            back.name = "BackFace";
+            back.transform.SetParent(transform, worldPositionStays: false);
+            back.transform.localPosition = new Vector3(0f, 0f, -0.001f); // 1 mm behind front
+            back.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            back.transform.localScale = new Vector3(cardWidth, cardHeight, 1f);
+            Destroy(back.GetComponent<MeshCollider>());
+
+            // Apply the URP material assigned in Inspector; fall back gracefully.
+            if (backgroundMaterial != null)
             {
-                elapsed += Time.deltaTime;
-                _canvasGroup.alpha = Mathf.Lerp(start, target, elapsed / fadeDuration);
-                yield return null;
+                _background.GetComponent<Renderer>().sharedMaterial = backgroundMaterial;
+                back.GetComponent<Renderer>().sharedMaterial = backgroundMaterial;
             }
-            _canvasGroup.alpha = target;
+
+            // --- Title (upper half) ----------------------------------------
+            // +0.003 on Z = slightly in front of the background quad toward the camera
+            _titleTmp = CreateTMPChild("TitleText",
+                new Vector3(0f,  cardHeight * 0.22f, 0.003f),
+                fontSize: cardHeight * 0.28f,
+                bold: true);
+
+            // --- Content (lower half) --------------------------------------
+            _contentTmp = CreateTMPChild("ContentText",
+                new Vector3(0f, -cardHeight * 0.15f, 0.003f),
+                fontSize: cardHeight * 0.18f,
+                bold: false);
         }
 
-        IEnumerator FadeAndDeactivate()
+        TextMeshPro CreateTMPChild(string childName, Vector3 localPos,
+                                   float fontSize, bool bold)
         {
-            yield return Fade(0f);
-            gameObject.SetActive(false);
+            var go = new GameObject(childName);
+            go.transform.SetParent(transform, worldPositionStays: false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale    = Vector3.one;
+
+            var tmp = go.AddComponent<TextMeshPro>();
+            tmp.fontSize          = fontSize;
+            tmp.alignment         = TextAlignmentOptions.Center;
+            tmp.color             = Color.white;
+            tmp.fontStyle         = bold ? FontStyles.Bold : FontStyles.Normal;
+            tmp.enableWordWrapping = true;
+            tmp.rectTransform.sizeDelta = new Vector2(cardWidth * 0.9f, cardHeight * 0.4f);
+
+            return tmp;
         }
     }
 }

@@ -74,11 +74,6 @@ namespace ARbnb
 
                 var spawnPos = ann.ToUnityPosition();
                 Debug.Log($"[ARbnb] Spawning '{ann.Title}' at {spawnPos}");
-                // TEMP DEBUG: red sphere to confirm world position
-                var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.transform.position = spawnPos;
-                sphere.transform.localScale = Vector3.one * 0.15f;
-                sphere.GetComponent<Renderer>().material.color = Color.red;
                 var panel = Instantiate(annotationPanelPrefab, spawnPos, Quaternion.identity);
                 panel.Initialise(ann);
                 _panels.Add(panel);

@@ -1,27 +1,27 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+
+const STORAGE_KEY = 'arbnb_user';
 
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => listener.subscription.unsubscribe();
+    const stored = localStorage.getItem(STORAGE_KEY);
+    setUser(stored ? JSON.parse(stored) : null);
+    setLoading(false);
   }, []);
 
-  const signIn = (email, password) =>
-    supabase.auth.signInWithPassword({ email, password });
+  function signIn(userId, name) {
+    const u = { id: userId, name };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    setUser(u);
+  }
 
-  const signOut = () => supabase.auth.signOut();
+  function signOut() {
+    localStorage.removeItem(STORAGE_KEY);
+    setUser(null);
+  }
 
   return { user, loading, signIn, signOut };
 }

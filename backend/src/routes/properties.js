@@ -1,13 +1,46 @@
 const express = require('express');
-const { body, param, validationResult } = require('express-validator');
+const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
+const { body, param, validationResult } = require('express-validator');
 const { requireHost } = require('../middleware/auth');
-const { supabaseAdmin } = require('../services/supabase');
 const prisma = require('../db/prisma');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-const uploadModel = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+
+// ── Local file storage ────────────────────────────────────────────────────────
+
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+
+function diskStorage(subfolder, allowedExts) {
+  return multer({
+    storage: multer.diskStorage({
+      destination(req, file, cb) {
+        const dir = path.join(UPLOADS_DIR, req.user.id, req.params.id, subfolder);
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+      },
+      filename(_req, file, cb) {
+        const ext = path.extname(file.originalname).toLowerCase() || '.bin';
+        cb(null, subfolder + ext);
+      },
+    }),
+    limits: { fileSize: 100 * 1024 * 1024 },
+    fileFilter(_req, file, cb) {
+      if (!allowedExts) return cb(null, true);
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, allowedExts.includes(ext));
+    },
+  });
+}
+
+function fileUrl(req, userId, propertyId, subfolder, filename) {
+  const protocol = req.protocol;
+  const host = req.get('host');
+  return `${protocol}://${host}/uploads/${userId}/${propertyId}/${subfolder}/${filename}`;
+}
+
+// ── Validation helper ─────────────────────────────────────────────────────────
 
 function validate(req, res, next) {
   const errors = validationResult(req);
@@ -15,7 +48,9 @@ function validate(req, res, next) {
   next();
 }
 
-// GET /api/properties – list all properties owned by the authenticated host
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+// GET /api/properties
 router.get('/', requireHost, async (req, res, next) => {
   try {
     const properties = await prisma.property.findMany({
@@ -23,33 +58,22 @@ router.get('/', requireHost, async (req, res, next) => {
       orderBy: { createdAt: 'desc' },
     });
     res.json(properties);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
-// GET /api/properties/:id – get a single property (host must own it)
-router.get(
-  '/:id',
-  requireHost,
-  param('id').isUUID(),
-  validate,
-  async (req, res, next) => {
-    try {
-      const property = await prisma.property.findFirstOrThrow({
-        where: { id: req.params.id, hostId: req.user.id },
-        include: { _count: { select: { annotations: true } } },
-      });
-      res.json(property);
-    } catch (err) {
-      next(err);
-    }
-  }
-);
+// GET /api/properties/:id
+router.get('/:id', requireHost, param('id').isUUID(), validate, async (req, res, next) => {
+  try {
+    const property = await prisma.property.findFirstOrThrow({
+      where: { id: req.params.id, hostId: req.user.id },
+      include: { _count: { select: { annotations: true } } },
+    });
+    res.json(property);
+  } catch (err) { next(err); }
+});
 
-// POST /api/properties – create a property
-router.post(
-  '/',
+// POST /api/properties
+router.post('/',
   requireHost,
   body('name').trim().notEmpty().withMessage('name is required'),
   body('address').optional().trim(),
@@ -57,22 +81,15 @@ router.post(
   async (req, res, next) => {
     try {
       const property = await prisma.property.create({
-        data: {
-          hostId: req.user.id,
-          name: req.body.name,
-          address: req.body.address || null,
-        },
+        data: { hostId: req.user.id, name: req.body.name, address: req.body.address || null },
       });
       res.status(201).json(property);
-    } catch (err) {
-      next(err);
-    }
+    } catch (err) { next(err); }
   }
 );
 
-// PUT /api/properties/:id – update name or address
-router.put(
-  '/:id',
+// PUT /api/properties/:id
+router.put('/:id',
   requireHost,
   param('id').isUUID(),
   body('name').optional().trim().notEmpty(),
@@ -80,132 +97,73 @@ router.put(
   validate,
   async (req, res, next) => {
     try {
-      // Verify ownership before update
-      await prisma.property.findFirstOrThrow({
-        where: { id: req.params.id, hostId: req.user.id },
-      });
+      await prisma.property.findFirstOrThrow({ where: { id: req.params.id, hostId: req.user.id } });
       const updated = await prisma.property.update({
         where: { id: req.params.id },
         data: {
-          ...(req.body.name && { name: req.body.name }),
+          ...(req.body.name     && { name: req.body.name }),
           ...(req.body.address !== undefined && { address: req.body.address }),
         },
       });
       res.json(updated);
-    } catch (err) {
-      next(err);
-    }
+    } catch (err) { next(err); }
   }
 );
 
-// DELETE /api/properties/:id – delete property and cascade annotations/sessions
-router.delete(
-  '/:id',
-  requireHost,
-  param('id').isUUID(),
-  validate,
-  async (req, res, next) => {
-    try {
-      await prisma.property.findFirstOrThrow({
-        where: { id: req.params.id, hostId: req.user.id },
-      });
-      await prisma.property.delete({ where: { id: req.params.id } });
-      res.status(204).send();
-    } catch (err) {
-      next(err);
-    }
-  }
-);
+// DELETE /api/properties/:id
+router.delete('/:id', requireHost, param('id').isUUID(), validate, async (req, res, next) => {
+  try {
+    await prisma.property.findFirstOrThrow({ where: { id: req.params.id, hostId: req.user.id } });
+    await prisma.property.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  } catch (err) { next(err); }
+});
 
-// POST /api/properties/:id/floor-plan – upload floor plan image to Supabase Storage
-router.post(
-  '/:id/floor-plan',
+// POST /api/properties/:id/floor-plan
+router.post('/:id/floor-plan',
   requireHost,
   param('id').isUUID(),
   validate,
-  upload.single('file'),
+  diskStorage('floor-plan', ['.jpg', '.jpeg', '.png', '.webp']).single('file'),
   async (req, res, next) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      await prisma.property.findFirstOrThrow({ where: { id: req.params.id, hostId: req.user.id } });
 
-      await prisma.property.findFirstOrThrow({
-        where: { id: req.params.id, hostId: req.user.id },
-      });
-
-      const ext = req.file.mimetype.split('/')[1] || 'png';
-      const path = `${req.user.id}/${req.params.id}/floor-plan.${ext}`;
-
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from(process.env.STORAGE_BUCKET)
-        .upload(path, req.file.buffer, {
-          contentType: req.file.mimetype,
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabaseAdmin.storage
-        .from(process.env.STORAGE_BUCKET)
-        .getPublicUrl(path);
-
+      const ext = path.extname(req.file.originalname).toLowerCase() || '.png';
+      const url = fileUrl(req, req.user.id, req.params.id, 'floor-plan', `floor-plan${ext}`);
       const updated = await prisma.property.update({
         where: { id: req.params.id },
-        data: { floorPlanUrl: urlData.publicUrl },
+        data: { floorPlanUrl: url },
       });
-
       res.json({ floorPlanUrl: updated.floorPlanUrl });
-    } catch (err) {
-      next(err);
-    }
+    } catch (err) { next(err); }
   }
 );
 
-// POST /api/properties/:id/model – upload a 3D model (GLB/GLTF, max 100 MB)
-router.post(
-  '/:id/model',
+// POST /api/properties/:id/model
+router.post('/:id/model',
   requireHost,
   param('id').isUUID(),
   validate,
-  uploadModel.single('file'),
+  diskStorage('model', ['.glb', '.gltf']).single('file'),
   async (req, res, next) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-      const allowedTypes = ['model/gltf-binary', 'model/gltf+json', 'application/octet-stream'];
-      const allowedExts = ['.glb', '.gltf'];
-      const ext = '.' + req.file.originalname.split('.').pop().toLowerCase();
-      if (!allowedExts.includes(ext)) {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      if (!['.glb', '.gltf'].includes(ext))
         return res.status(400).json({ error: 'Only .glb and .gltf files are accepted' });
-      }
 
-      await prisma.property.findFirstOrThrow({
-        where: { id: req.params.id, hostId: req.user.id },
-      });
+      await prisma.property.findFirstOrThrow({ where: { id: req.params.id, hostId: req.user.id } });
 
-      const path = `${req.user.id}/${req.params.id}/model${ext}`;
-
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from(process.env.STORAGE_BUCKET)
-        .upload(path, req.file.buffer, {
-          contentType: req.file.mimetype || 'model/gltf-binary',
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabaseAdmin.storage
-        .from(process.env.STORAGE_BUCKET)
-        .getPublicUrl(path);
-
+      const url = fileUrl(req, req.user.id, req.params.id, 'model', `model${ext}`);
       const updated = await prisma.property.update({
         where: { id: req.params.id },
-        data: { modelUrl: urlData.publicUrl },
+        data: { modelUrl: url },
       });
-
       res.json({ modelUrl: updated.modelUrl });
-    } catch (err) {
-      next(err);
-    }
+    } catch (err) { next(err); }
   }
 );
 
