@@ -17,9 +17,13 @@ namespace ARbnb
     /// </summary>
     public class AnnotationPanel : MonoBehaviour
     {
-        // Width / height of the floating card in metres
-        [SerializeField] float cardWidth  = 0.55f;
-        [SerializeField] float cardHeight = 0.25f;
+        // Width / height of the floating card in metres (at scale 1 on the root transform)
+        [SerializeField] float cardWidth    = 0.35f;
+        [SerializeField] float cardHeight   = 0.22f;
+        // Scale of TMP child transforms — directly controls world-space text size.
+        // Increase these to make text bigger; no rebuild needed to understand direction.
+        [SerializeField] float titleScale   = 0.006f;
+        [SerializeField] float contentScale = 0.004f;
 
         /// <summary>
         /// A URP-compatible material for the background quad.
@@ -42,6 +46,7 @@ namespace ARbnb
 
         void Awake()
         {
+            transform.localScale = Vector3.one; // override any stale prefab scale
             BuildCard();
             gameObject.SetActive(false);
         }
@@ -54,9 +59,11 @@ namespace ARbnb
         void LateUpdate()
         {
             if (_mainCamera == null) return;
-            // Face the camera: panel's local +Z toward camera so Quad/TMP front face is visible
+            // Face the camera: panel's local -Z toward camera.
+            // TextMeshPro 3D renders its readable face on the -Z side;
+            // the BackFace quad (rotated 180°) is what the camera sees.
             transform.rotation = Quaternion.LookRotation(
-                _mainCamera.transform.position - transform.position);
+                transform.position - _mainCamera.transform.position);
         }
 
         // ── Public API ───────────────────────────────────────────────────────
@@ -125,35 +132,42 @@ namespace ARbnb
             }
 
             // --- Title (upper half) ----------------------------------------
-            // +0.003 on Z = slightly in front of the background quad toward the camera
+            // -0.003 on Z = in front of the background toward the camera
+            // (panel -Z faces camera, so negative local Z = closer to camera)
             _titleTmp = CreateTMPChild("TitleText",
-                new Vector3(0f,  cardHeight * 0.22f, 0.003f),
-                fontSize: cardHeight * 0.28f,
+                new Vector3(0f,  cardHeight * 0.22f, -0.003f),
+                scale: titleScale,
                 bold: true);
 
-            // --- Content (lower half) --------------------------------------
             _contentTmp = CreateTMPChild("ContentText",
-                new Vector3(0f, -cardHeight * 0.15f, 0.003f),
-                fontSize: cardHeight * 0.18f,
+                new Vector3(0f, -cardHeight * 0.15f, -0.003f),
+                scale: contentScale,
                 bold: false);
         }
 
         TextMeshPro CreateTMPChild(string childName, Vector3 localPos,
-                                   float fontSize, bool bold)
+                                   float scale, bool bold)
         {
             var go = new GameObject(childName);
             go.transform.SetParent(transform, worldPositionStays: false);
             go.transform.localPosition = localPos;
             go.transform.localRotation = Quaternion.identity;
-            go.transform.localScale    = Vector3.one;
+            // Scale directly controls world-space text size — independent of TMP unit system
+            go.transform.localScale = Vector3.one * scale;
 
             var tmp = go.AddComponent<TextMeshPro>();
-            tmp.fontSize          = fontSize;
-            tmp.alignment         = TextAlignmentOptions.Center;
-            tmp.color             = Color.white;
-            tmp.fontStyle         = bold ? FontStyles.Bold : FontStyles.Normal;
+            tmp.fontSize           = 36;   // fixed reference size in TMP points
+            tmp.alignment          = TextAlignmentOptions.Center;
+            tmp.color              = Color.white;
+            tmp.fontStyle          = bold ? FontStyles.Bold : FontStyles.Normal;
             tmp.enableWordWrapping = true;
-            tmp.rectTransform.sizeDelta = new Vector2(cardWidth * 0.9f, cardHeight * 0.4f);
+            tmp.enableAutoSizing   = false;
+            tmp.overflowMode       = TextOverflowModes.Truncate;
+            // Convert card world-space dimensions to TMP local units (world / scale)
+            // so word-wrap triggers at the card edge, not at some huge default rect.
+            tmp.rectTransform.sizeDelta = new Vector2(
+                cardWidth * 0.85f / scale,
+                cardHeight        / scale);
 
             return tmp;
         }

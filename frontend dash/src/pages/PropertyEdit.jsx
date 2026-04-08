@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import FloorPlanEditor from '../components/FloorPlanEditor';
 import ModelViewer from '../components/ModelViewer';
+import FloorPlanModelGenerator from '../components/FloorPlanModelGenerator';
 
 export default function PropertyEdit() {
   const { id } = useParams();
@@ -48,9 +49,10 @@ export default function PropertyEdit() {
         title: selectedAnnotation.title,
         content: selectedAnnotation.content,
         roomLabel: selectedAnnotation.roomLabel ?? '',
+        height: selectedAnnotation.worldY ?? 0,
       });
     } else {
-      setForm({ title: '', content: '', roomLabel: '' });
+      setForm({ title: '', content: '', roomLabel: '', height: 0 });
     }
   }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -126,6 +128,7 @@ export default function PropertyEdit() {
         title: form.title,
         content: form.content,
         roomLabel: form.roomLabel || null,
+        ...(selectedAnnotation.worldX != null && { worldY: parseFloat(form.height) || 0 }),
       });
       setAnnotations((prev) => prev.map((a) => (a.id === selectedId ? { ...a, ...updated } : a)));
     } catch (e) {
@@ -250,13 +253,21 @@ export default function PropertyEdit() {
                 onLoadStart={() => setModelLoading(true)}
                 onLoadEnd={() => setModelLoading(false)}
               />
+            ) : property?.floorPlanUrl ? (
+              <FloorPlanModelGenerator
+                propertyId={id}
+                floorPlanUrl={property.floorPlanUrl}
+                onModelReady={(modelUrl) => {
+                  setProperty((p) => ({ ...p, modelUrl }));
+                }}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
                 <svg className="w-12 h-12 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                     d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
                 </svg>
-                <p className="text-sm">Upload a .glb or .gltf model to get started</p>
+                <p className="text-sm">Upload a .glb / .gltf model, or upload a floor plan first to auto-generate one</p>
                 <p className="text-xs text-gray-300">Model should be in metres scale for accurate AR placement</p>
               </div>
             )}
@@ -311,10 +322,24 @@ export default function PropertyEdit() {
                 />
               </div>
 
-              {/* Show 3D world position if set */}
+              {/* Height — only relevant for 3D-placed annotations */}
               {selectedAnnotation.worldX != null && (
-                <div className="text-xs text-gray-400 font-mono bg-gray-50 rounded p-2">
-                  3D: ({selectedAnnotation.worldX.toFixed(3)}, {selectedAnnotation.worldY.toFixed(3)}, {selectedAnnotation.worldZ.toFixed(3)}) m
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Height (m)
+                    <span className="ml-1 font-normal text-gray-400">— distance above floor in AR</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={form.height}
+                    onChange={(e) => setForm((f) => ({ ...f, height: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    0 = floor · 1.0 = table · 1.5 = eye level
+                  </p>
                 </div>
               )}
 
