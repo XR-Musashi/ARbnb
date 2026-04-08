@@ -79,7 +79,7 @@ adb reverse tcp:3001 tcp:3001
 **Build for Android:**
 - Switch platform to Android, minimum API 26, target API 35
 - Scripting backend: IL2CPP, ARM64 only
-- Bundle ID: `com.musashi.arbnb`
+- Bundle ID: `com.musashi.arbnb2`
 - `File > Build Settings > Build And Run` to deploy to S25 Ultra over USB
 
 **ARCore Extensions** (Google Cloud Anchors) — add via Package Manager by name: `com.google.ar.core.arfoundation-extensions`
@@ -101,6 +101,18 @@ adb reverse tcp:3001 tcp:3001
 - The card (Quad + 3D TMP labels) is built entirely in code at runtime — do not add Canvas children
 
 **World-space UI note:** `GameObject.CreatePrimitive()` at runtime in a URP project gets Unity's legacy `Default-Material` (Standard shader), which renders **purple** in URP. Always assign a pre-authored URP material via `[SerializeField]`; never rely on `Shader.Find` in a build (shader won't be included unless referenced by a material asset).
+
+**AnnotationPanel card geometry (from `BuildCard()`):**
+- `Background` quad at `localPosition = (0,0,0)` — back face, not seen by camera
+- `BackFace` quad at `localPosition = (0,0,-0.001)`, `localRotation = Euler(0,180,0)` — faces camera (which looks in +Z local direction); 1 mm offset prevents z-fighting
+- TMP children at `localPosition.z = -0.003` — in front of both quads toward camera
+- Billboard: `LookRotation(panelPos - camPos)` points panel's **-Z axis** toward camera; TMP 3D's readable face is on the -Z side of the child GameObject, so text reads correctly
+- TMP word wrap: `rectTransform.sizeDelta = new Vector2(cardWidth * 0.85f / scale, cardHeight / scale)` — converts world-space card dimensions into TMP local units (world / localScale); without this the default large rect means text never wraps at the card boundary
+
+**TMP 3D text sizing:**
+- `fontSize` is in internal font-point units, NOT world metres. At the default LiberationSans SDF font sampled at 90 pt, `fontSize` values 0.03–15 all produce characters of nearly identical, submillimetre size.
+- Control visible world-space size via `go.transform.localScale = Vector3.one * scale` where `scale` is a `[SerializeField]` (typically 0.004–0.008 for text readable at ~1.5 m AR distance).
+- Fix `fontSize = 36` (standard TMP reference size) and only adjust `scale` in the Inspector.
 
 **Unity scripting conventions:**
 - Use `FindAnyObjectByType<T>()` (Unity 6 API — `FindObjectOfType` is deprecated)
@@ -178,11 +190,20 @@ npm test
 **Login page:** two buttons — "User 1" and "User 2". No password.
 
 **Key components:**
-- `src/pages/PropertyEdit.jsx` — main editor page with 2D/3D tab toggle
+- `src/pages/PropertyEdit.jsx` — main editor page with 2D/3D tab toggle; annotation sidebar includes a **Height (m)** field that writes to `worldY` (only shown for 3D-positioned annotations)
 - `src/components/FloorPlanEditor.jsx` — orthographic Three.js canvas; click to place pins (stores `floorX/floorY`, normalised 0–1)
 - `src/components/ModelViewer.jsx` — perspective Three.js canvas; orbit mode + place-pin mode; GLTFLoader with DRACOLoader; stores `worldX/worldY/worldZ` in metres
+- `src/components/FloorPlanModelGenerator.jsx` — generates a flat horizontal GLB from the floor plan image and uploads it as the property's 3D model (see below)
 - `src/lib/api.js` — fetch wrapper; reads auth token from localStorage; no Supabase
 - `src/hooks/useAuth.js` — localStorage-based auth state
+
+**FloorPlanModelGenerator pipeline:**
+1. Floor plan image URL is converted from absolute (`http://localhost:3001/uploads/…`) to relative (`/uploads/…`) and fetched through the Vite proxy to avoid CORS
+2. Loaded as a `THREE.Texture` with `colorSpace = THREE.SRGBColorSpace`; `flipY` left at default `true` — Three.js flips image data for WebGL's bottom-left UV origin and `GLTFExporter` compensates UV coordinates automatically
+3. `THREE.PlaneGeometry(width, depth)` rotated `-Math.PI/2` around X to lie flat on the XZ plane (Y = 0, floor level); `THREE.MeshBasicMaterial({ side: THREE.DoubleSide })`
+4. `GLTFExporter.parse(scene, …, { binary: true })` serialises to a binary GLB `ArrayBuffer` (coordinates in metres per GLTF spec)
+5. Uploaded to `POST /api/properties/:id/model` as `model/gltf-binary`
+- **Vite proxy:** `vite.config.js` proxies both `/api` and `/uploads` to `http://localhost:3001` so floor plan images can be fetched without CORS during GLB generation
 
 **3D model notes:**
 - Draco decoder WASM files are in `frontend dash/public/draco/` (served statically)
@@ -190,6 +211,7 @@ npm test
 - Blender export: File → Export → glTF 2.0 (.glb), Y-up, metres
 - Annotation list: purple dot = 3D position, pink dot = 2D position
 - Clicking a pin in the list auto-switches to the correct tab (2D/3D)
+- 2D-only annotations (`floorX/Y` set, no `worldX/Y/Z`) do **not** appear in AR; host must generate/upload a 3D model and re-place pins to get AR visibility
 
 ---
 

@@ -37,6 +37,9 @@ namespace ARbnb
         {
             _cam = Camera.main;
             arrowObject.SetActive(false);
+            // Render above the AR plane visualiser (Transparent queue = 3000)
+            foreach (var r in arrowObject.GetComponentsInChildren<Renderer>())
+                r.material.renderQueue = 3500;
 
             if (destinationDropdown != null)
                 destinationDropdown.onValueChanged.AddListener(OnDestinationChanged);

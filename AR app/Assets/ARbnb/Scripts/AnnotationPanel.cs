@@ -54,6 +54,13 @@ namespace ARbnb
         void Start()
         {
             _mainCamera = Camera.main;
+            // Render above the AR plane visualiser (Transparent queue = 3000)
+            // so panels are never hidden behind the dotted grid.
+            const int queue = 3500;
+            foreach (var r in GetComponentsInChildren<Renderer>())
+                r.material.renderQueue = queue;
+            if (_titleTmp   != null) _titleTmp.fontMaterial.renderQueue   = queue;
+            if (_contentTmp != null) _contentTmp.fontMaterial.renderQueue = queue;
         }
 
         void LateUpdate()
