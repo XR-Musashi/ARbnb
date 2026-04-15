@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="slides-format" content="viewport">
+    <title>ARbnb — AR Indoor Navigation System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        @theme {
+            --color-bg: #080d14;
+            --color-bg-deep: #040810;
+            --color-surface: #0f1a27;
+            --color-text: #e8f4fd;
+            --color-text-secondary: #9bbfd8;
+            --color-text-muted: #5a8aaa;
+            --color-accent-1: #4fc3f7;
+            --color-accent-2: #7c83f7;
+            --color-accent-3: #26c6da;
+            --color-glass-bg: rgba(79,195,247,0.05);
+            --color-glass-border: rgba(79,195,247,0.12);
+            --color-vignette: rgba(0,0,0,0.5);
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-body: 'Space Grotesk', sans-serif;
+        }
+    </style>
+    <style>
+        :root { --color-bg: #080d14; --color-text: #e8f4fd; --glow-color-rgb: 79,195,247; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { background: var(--color-bg); }
+        body { font-family: 'Space Grotesk', sans-serif; color: var(--color-text); overflow: hidden; height: 100vh; width: 100vw; }
+        .deck { width: 100vw; height: 100vh; position: relative; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--color-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transform: scale(0.96); transition: opacity 0.65s ease, transform 0.65s ease; pointer-events: none; overflow: hidden; }
+        .slide.active { opacity: 1; transform: scale(1); pointer-events: all; }
+        .slide > .content { position: relative; z-index: 2; width: 100%; max-width: 1100px; padding: clamp(1.5rem, 3.5vw, 3.5rem); }
+        .nav-controls { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; z-index: 100; background: rgba(79,195,247,0.06); backdrop-filter: blur(12px); padding: 9px 22px; border-radius: 40px; border: 1px solid rgba(79,195,247,0.12); }
+        .nav-btn { width: 38px; height: 38px; border: none; background: rgba(79,195,247,0.08); color: #4fc3f7; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.3s; }
+        .nav-btn:hover { background: rgba(79,195,247,0.18); }
+        .slide-dots { display: flex; gap: 7px; }
+        .slide-dots .dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(79,195,247,0.18); cursor: pointer; transition: background 0.3s, transform 0.3s; }
+        .slide-dots .dot.active { background: #4fc3f7; transform: scale(1.35); }
+        .slide-counter { font-size: 0.78rem; color: #5a8aaa; min-width: 38px; text-align: center; font-family: 'Space Mono', monospace; }
+        .reveal { opacity: 0; transform: translateY(18px); }
+        @keyframes float-slow { 0%{transform:translate(0,0) scale(1)} 25%{transform:translate(50px,-45px) scale(1.1)} 50%{transform:translate(-35px,35px) scale(0.92)} 75%{transform:translate(45px,18px) scale(1.07)} 100%{transform:translate(0,0) scale(1)} }
+        @keyframes float-drift { 0%{transform:translate(0,0) scale(1) rotate(0deg)} 33%{transform:translate(-45px,-55px) scale(1.14) rotate(3deg)} 66%{transform:translate(38px,28px) scale(0.87) rotate(-2deg)} 100%{transform:translate(0,0) scale(1) rotate(0deg)} }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(100%)} }
+        @keyframes pulse-ring { 0%,100%{box-shadow:0 0 0 0 rgba(79,195,247,0.4)} 50%{box-shadow:0 0 0 12px rgba(79,195,247,0)} }
+        @keyframes glow-pulse { 0%,100%{text-shadow:0 0 20px rgba(79,195,247,0.5),0 0 40px rgba(79,195,247,0.2)} 50%{text-shadow:0 0 30px rgba(79,195,247,0.85),0 0 60px rgba(79,195,247,0.35)} }
+        .gradient-mesh { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        .blob { position: absolute; border-radius: 50%; filter: blur(80px); animation: float-slow 12s ease-in-out infinite; }
+        .blob:nth-child(2) { animation: float-drift 16s ease-in-out infinite; }
+        .blob:nth-child(3) { animation: float-slow 20s ease-in-out infinite reverse; }
+        .slide::before { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); background-repeat:repeat; background-size:256px; opacity:0.03; mix-blend-mode:overlay; }
+        .slide::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background:radial-gradient(ellipse at center, transparent 50%, var(--color-vignette) 100%); }
+        .text-glow { text-shadow: 0 0 20px rgba(79,195,247,0.5), 0 0 40px rgba(79,195,247,0.2); }
+        .stat-glow { text-shadow: 0 0 30px rgba(79,195,247,0.6), 0 0 60px rgba(79,195,247,0.25); animation: glow-pulse 3s ease-in-out infinite; }
+        .glass-card { background: rgba(79,195,247,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(79,195,247,0.12); border-radius: 16px; padding: 1.5rem; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .glass-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(79,195,247,0.12); }
+        .accent-border { border-left: 3px solid #4fc3f7; }
+        .tag { background: rgba(79,195,247,0.1); border: 1px solid rgba(79,195,247,0.2); border-radius: 6px; padding: 3px 10px; font-size: 0.72rem; font-family: 'Space Mono', monospace; color: #4fc3f7; letter-spacing: 0.05em; display: inline-block; }
+        .tag-purple { background: rgba(124,131,247,0.1); border-color: rgba(124,131,247,0.2); color: #7c83f7; }
+        .tag-cyan { background: rgba(38,198,218,0.1); border-color: rgba(38,198,218,0.2); color: #26c6da; }
+        .flow-arrow { color: #4fc3f7; font-size: 1.4rem; opacity: 0.6; }
+        .mono { font-family: 'Space Mono', monospace; font-size: 0.8rem; }
+        .ar-card { background: rgba(8,13,20,0.85); border: 1px solid rgba(79,195,247,0.25); border-radius: 12px; padding: 1rem 1.2rem; position: relative; overflow: hidden; }
+        .ar-card::before { content:''; position:absolute; top:0; left:0; width:100%; height:2px; background:linear-gradient(90deg, transparent, #4fc3f7, transparent); animation: scanline 2.5s linear infinite; }
+        .section-label { font-family: 'Space Mono', monospace; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: #4fc3f7; opacity: 0.7; margin-bottom: 0.5rem; }
+        .phase-badge { background: linear-gradient(135deg, rgba(79,195,247,0.15), rgba(124,131,247,0.15)); border: 1px solid rgba(79,195,247,0.2); border-radius: 8px; padding: 0.3rem 0.8rem; font-family: 'Space Mono', monospace; font-size: 0.7rem; color: #4fc3f7; display: inline-block; }
+    </style>
+</head>
+<body>
+<div class="mouse-spotlight" style="position:fixed;inset:0;z-index:99;pointer-events:none;"></div>
+
+<div class="deck">
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide slide-1 active" data-slide="1">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:520px;height:520px;top:-120px;right:-100px;background:#4fc3f7;opacity:0.13;"></div>
+        <div class="blob" style="width:320px;height:320px;bottom:-90px;left:-70px;background:#7c83f7;opacity:0.11;"></div>
+        <div class="blob" style="width:220px;height:220px;top:45%;left:12%;background:#26c6da;opacity:0.09;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <div style="font-size:90px;margin-bottom:1rem;animation:float 3.5s ease-in-out infinite;" class="reveal">🏠</div>
+        <div class="reveal" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:1.2rem;">
+            <span class="tag">AR Foundation 6.4.1</span>
+            <span class="tag tag-purple">Unity 6</span>
+            <span class="tag tag-cyan">ARCore</span>
+            <span class="tag">Google Cloud Anchors</span>
+            <span class="tag tag-purple">React + Three.js</span>
+        </div>
+        <h1 class="font-display reveal" style="font-size:clamp(3rem,7vw,5.5rem);font-weight:800;background:linear-gradient(135deg,#4fc3f7,#7c83f7,#26c6da);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-0.02em;line-height:1.05;margin-bottom:1rem;">ARbnb</h1>
+        <p class="reveal" style="font-size:clamp(0.9rem,1.6vw,1.3rem);color:#9bbfd8;letter-spacing:0.12em;text-transform:uppercase;font-weight:400;margin-bottom:0.6rem;">AR Indoor Navigation &amp; Spatial Annotation</p>
+        <p class="reveal" style="font-family:'Space Mono',monospace;font-size:0.8rem;color:#5a8aaa;">Team Musashi · Trinity College Dublin</p>
+    </div>
+</div>
+
+<!-- SLIDE 2: THE PROBLEM -->
+<div class="slide slide-2" data-slide="2">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:380px;height:380px;top:-80px;left:-60px;background:#7c83f7;opacity:0.09;"></div>
+        <div class="blob" style="width:280px;height:280px;bottom:-60px;right:-40px;background:#4fc3f7;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="section-label reveal">Problem Space</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.8rem,3.8vw,2.8rem);font-weight:700;margin-bottom:0.4rem;color:#e8f4fd;">Guests Are Lost in Unfamiliar Spaces</h2>
+        <p class="reveal" style="color:#9bbfd8;font-size:0.95rem;margin-bottom:1.8rem;max-width:60ch;">Airbnb guests arrive at properties they've never seen — no spatial context, no guided orientation, and no persistent instructions anchored to the real world.</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;">
+            <div class="glass-card reveal">
+                <div style="font-size:2.2rem;margin-bottom:0.7rem;">🗺️</div>
+                <h3 style="font-size:1rem;font-weight:600;color:#4fc3f7;margin-bottom:0.4rem;">No Spatial Context</h3>
+                <p style="font-size:0.85rem;color:#9bbfd8;line-height:1.5;">Guests wander through unfamiliar layouts — where is the WiFi router, the boiler switch, the emergency exit?</p>
+            </div>
+            <div class="glass-card reveal">
+                <div style="font-size:2.2rem;margin-bottom:0.7rem;">📋</div>
+                <h3 style="font-size:1rem;font-weight:600;color:#7c83f7;margin-bottom:0.4rem;">Host Overhead</h3>
+                <p style="font-size:0.85rem;color:#9bbfd8;line-height:1.5;">Hosts write long check-in PDFs that guests rarely read. Repeated questions eat into time for both parties.</p>
+            </div>
+            <div class="glass-card reveal">
+                <div style="font-size:2.2rem;margin-bottom:0.7rem;">🔄</div>
+                <h3 style="font-size:1rem;font-weight:600;color:#26c6da;margin-bottom:0.4rem;">No Persistence</h3>
+                <p style="font-size:0.85rem;color:#9bbfd8;line-height:1.5;">Paper notes vanish and text instructions lose meaning without physical context. Every new guest starts from zero.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 3: SOLUTION OVERVIEW -->
+<div class="slide slide-3" data-slide="3">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:400px;height:400px;top:-60px;right:-80px;background:#4fc3f7;opacity:0.1;"></div>
+        <div class="blob" style="width:250px;height:250px;bottom:-50px;left:-30px;background:#26c6da;opacity:0.08;"></div>
+    </div>
+    <div class="content">
+        <div class="section-label reveal">The Solution</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.8rem,3.8vw,2.8rem);font-weight:700;margin-bottom:1.6rem;color:#e8f4fd;">Spatially-Anchored Instructions in AR</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;margin-bottom:1.4rem;">
+            <div class="glass-card reveal" style="border-color:rgba(79,195,247,0.2);">
+                <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem;">
+                    <span style="font-size:1.8rem;">📱</span>
+                    <h3 style="font-size:1rem;font-weight:600;color:#4fc3f7;">Guest AR App</h3>
+                </div>
+                <p style="font-size:0.85rem;color:#9bbfd8;line-height:1.5;">Floating waypoint arrows guide guests through the property. Proximity-triggered annotation panels — anchored to real objects — surface instructions exactly where they're needed.</p>
+                <div style="margin-top:0.8rem;display:flex;gap:6px;flex-wrap:wrap;">
+                    <span class="tag">Unity 6</span><span class="tag">ARCore SLAM</span>
+                </div>
+            </div>
+            <div class="glass-card reveal" style="border-color:rgba(124,131,247,0.2);">
+                <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem;">
+                    <span style="font-size:1.8rem;">🖥️</span>
+                    <h3 style="font-size:1rem;font-weight:600;color:#7c83f7;">Host Dashboard</h3>
+                </div>
+                <p style="font-size:0.85rem;color:#9bbfd8;line-height:1.5;">Hosts author annotations using a browser-based editor with 2D floor plan view and an interactive 3D model viewer. No AR device required to set up the property.</p>
+                <div style="margin-top:0.8rem;display:flex;gap:6px;flex-wrap:wrap;">
+                    <span class="tag tag-purple">React 18</span><span class="tag tag-purple">Three.js r170</span>
+                </div>
+            </div>
+        </div>
+        <div class="glass-card reveal" style="border-color:rgba(38,198,218,0.2);padding:1rem 1.3rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+                <span style="font-size:1.6rem;">⚓</span>
+                <div>
+                    <h3 style="font-size:0.95rem;font-weight:600;color:#26c6da;display:inline;">Google Cloud Anchors</h3>
+                    <span style="color:#9bbfd8;font-size:0.82rem;"> — Annotations persist across all guest sessions. Once hosted, the AR anchor resolves for every future guest on re-visit.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 4: AR APP DEEP DIVE -->
+<div class="slide slide-4" data-slide="4">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:360px;height:360px;top:-60px;right:-60px;background:#4fc3f7;opacity:0.09;"></div>
+        <div class="blob" style="width:220px;height:220px;bottom:-50px;left:-30px;background:#7c83f7;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="section-label reveal">Component 1</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.7rem,3.5vw,2.5rem);font-weight:700;margin-bottom:1.4rem;color:#e8f4fd;">The AR Guest App</h2>
+        <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:1.4rem;align-items:start;">
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div class="glass-card accent-border reveal" style="padding:1rem 1.2rem;">
+                    <h4 style="font-size:0.88rem;font-weight:600;color:#4fc3f7;margin-bottom:0.4rem;">ARbnbSession.cs</h4>
+                    <p style="font-size:0.82rem;color:#9bbfd8;">Session token management and API bootstrap. All scripts live on a single <span class="mono" style="color:#4fc3f7;">ARbnb</span> GameObject.</p>
+                </div>
+                <div class="glass-card reveal" style="border-color:rgba(124,131,247,0.2);padding:1rem 1.2rem;">
+                    <h4 style="font-size:0.88rem;font-weight:600;color:#7c83f7;margin-bottom:0.4rem;">AnnotationManager.cs</h4>
+                    <p style="font-size:0.82rem;color:#9bbfd8;">Fetches annotations from API, spawns world-space panels, runs <span class="mono" style="color:#7c83f7;">SyncCloudAnchorsAsync</span>. Max 3 visible panels simultaneously (distance-sorted).</p>
+                </div>
+                <div class="glass-card reveal" style="border-color:rgba(38,198,218,0.2);padding:1rem 1.2rem;">
+                    <h4 style="font-size:0.88rem;font-weight:600;color:#26c6da;margin-bottom:0.4rem;">AnnotationPanel.cs</h4>
+                    <p style="font-size:0.82rem;color:#9bbfd8;">World-space floating card built from a Quad + 3D TMP labels. No Canvas/UGUI — uses URP-compatible materials. <span class="mono" style="color:#26c6da;">SnapToAnchor(Transform)</span> re-parents to resolved anchor.</p>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.8rem;">
+                <div class="ar-card reveal">
+                    <div style="font-size:0.7rem;font-family:'Space Mono',monospace;color:#4fc3f7;opacity:0.7;margin-bottom:0.5rem;">// AR Annotation Card</div>
+                    <div style="font-size:0.82rem;color:#e8f4fd;font-weight:600;margin-bottom:0.3rem;">🔧 Boiler Room</div>
+                    <div style="font-size:0.78rem;color:#9bbfd8;line-height:1.5;">Turn dial to setting 3 for hot water. Press reset if pilot light is out.</div>
+                    <div style="display:flex;gap:6px;margin-top:0.6rem;">
+                        <span class="tag" style="font-size:0.65rem;">ANCHORED</span>
+                        <span class="tag tag-cyan" style="font-size:0.65rem;">2.3m away</span>
+                    </div>
+                </div>
+                <div class="glass-card reveal" style="padding:1rem;">
+                    <div class="section-label" style="margin-bottom:0.5rem;">Key Constraint</div>
+                    <p style="font-size:0.8rem;color:#9bbfd8;line-height:1.5;">Z-axis negation required when consuming API coords in Unity:<br/>
+                    <span class="mono" style="color:#4fc3f7;">new Vector3(worldX, worldY, -worldZ)</span><br/>
+                    Three.js is right-handed; Unity is left-handed.</p>
+                </div>
+                <div class="glass-card reveal" style="padding:0.8rem 1rem;">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <span class="tag">AR Foundation 6.4.1</span>
+                        <span class="tag tag-purple">URP 17.4.0</span>
+                        <span class="tag tag-cyan">XR Toolkit 3.4.0</span>
+                        <span class="tag">IL2CPP ARM64</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 5: CLOUD ANCHOR FLOW -->
+<div class="slide slide-5" data-slide="5">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:400px;height:400px;top:-80px;left:-60px;background:#26c6da;opacity:0.09;"></div>
+        <div class="blob" style="width:250px;height:250px;bottom:-60px;right:-40px;background:#4fc3f7;opacity:0.07;"></div>
+    </div>
+    <canvas class="particle-canvas-ambient" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content">
+        <div class="section-label reveal">Spatial Persistence</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.7rem,3.5vw,2.5rem);font-weight:700;margin-bottom:1.4rem;color:#e8f4fd;">Cloud Anchor Two-Phase Flow</h2>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-bottom:1.2rem;">
+            <div class="glass-card reveal" style="text-align:center;padding:1.2rem 1rem;">
+                <div class="phase-badge" style="margin-bottom:0.8rem;">Phase 1 · First Guest</div>
+                <div style="font-size:1.8rem;margin-bottom:0.6rem;">🏗️</div>
+                <h4 style="font-size:0.9rem;font-weight:600;color:#4fc3f7;margin-bottom:0.4rem;">Host Anchor</h4>
+                <p style="font-size:0.8rem;color:#9bbfd8;line-height:1.5;">Panels appear at raw <span class="mono" style="color:#4fc3f7;">worldX/Y/Z</span>. <span class="mono" style="color:#4fc3f7;">HostAnchorAsync</span> runs in background. Result <span class="mono" style="color:#4fc3f7;">cloudAnchorId</span> saved to DB via <span class="mono">POST /api/anchors</span>.</p>
+            </div>
+            <div class="glass-card reveal" style="text-align:center;padding:1.2rem 1rem;border-color:rgba(124,131,247,0.2);">
+                <div class="phase-badge" style="margin-bottom:0.8rem;background:linear-gradient(135deg,rgba(124,131,247,0.15),rgba(79,195,247,0.15));border-color:rgba(124,131,247,0.2);color:#7c83f7;">Phase 2 · Subsequent</div>
+                <div style="font-size:1.8rem;margin-bottom:0.6rem;">📍</div>
+                <h4 style="font-size:0.9rem;font-weight:600;color:#7c83f7;margin-bottom:0.4rem;">Resolve Anchor</h4>
+                <p style="font-size:0.8rem;color:#9bbfd8;line-height:1.5;">Panels start at raw positions, then <span class="mono" style="color:#7c83f7;">SnapToAnchor</span> re-parents each panel to the resolved <span class="mono" style="color:#7c83f7;">ARAnchor</span> once <span class="mono">ResolveAnchorAsync</span> completes.</p>
+            </div>
+            <div class="glass-card reveal" style="text-align:center;padding:1.2rem 1rem;border-color:rgba(38,198,218,0.2);">
+                <div class="phase-badge" style="margin-bottom:0.8rem;background:linear-gradient(135deg,rgba(38,198,218,0.15),rgba(79,195,247,0.1));border-color:rgba(38,198,218,0.2);color:#26c6da;">Fallback</div>
+                <div style="font-size:1.8rem;margin-bottom:0.6rem;">🔒</div>
+                <h4 style="font-size:0.9rem;font-weight:600;color:#26c6da;margin-bottom:0.4rem;">Local Fallback</h4>
+                <p style="font-size:0.8rem;color:#9bbfd8;line-height:1.5;">If <span class="mono" style="color:#26c6da;">CloudAnchorService</span> is not wired in the Inspector, <span class="mono">AnnotationManager</span> skips cloud sync. Panels remain at raw world positions using local <span class="mono">ARAnchorManager</span>.</p>
+            </div>
+        </div>
+        <div class="ar-card reveal" style="display:flex;align-items:center;gap:1.5rem;padding:1rem 1.3rem;">
+            <span style="font-size:1.4rem;flex-shrink:0;">⚙️</span>
+            <p style="font-size:0.82rem;color:#9bbfd8;"><strong style="color:#4fc3f7;">CloudAnchorService.cs</strong> — wraps ARCore Extensions Cloud Anchor API. <span class="mono" style="color:#4fc3f7;">HostAnchorAsync(Vector3)</span> and <span class="mono" style="color:#4fc3f7;">ResolveAnchorAsync(string cloudAnchorId)</span>. Requires <span class="mono">ARAnchorManager</span> assigned in Inspector. Markerless ARCore SLAM only — no image targets.</p>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 6: HOST DASHBOARD -->
+<div class="slide slide-6" data-slide="6">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:380px;height:380px;top:-70px;right:-60px;background:#7c83f7;opacity:0.09;"></div>
+        <div class="blob" style="width:240px;height:240px;bottom:-50px;left:-30px;background:#4fc3f7;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="section-label reveal">Component 2</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.7rem,3.5vw,2.5rem);font-weight:700;margin-bottom:1.4rem;color:#e8f4fd;">Host Web Dashboard</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.3rem;">
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div class="glass-card reveal" style="border-color:rgba(79,195,247,0.2);padding:1.1rem 1.2rem;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+                        <span style="font-size:1.3rem;">🗺️</span>
+                        <h4 style="font-size:0.9rem;font-weight:600;color:#4fc3f7;">2D Floor Plan Editor</h4>
+                        <span class="tag" style="font-size:0.65rem;margin-left:auto;">FloorPlanEditor.jsx</span>
+                    </div>
+                    <p style="font-size:0.82rem;color:#9bbfd8;line-height:1.5;">Orthographic Three.js canvas. Click to place pins storing normalised <span class="mono" style="color:#4fc3f7;">floorX/Y</span> (0–1 range). Upload JPG floor plan up to 100 MB.</p>
+                </div>
+                <div class="glass-card reveal" style="border-color:rgba(124,131,247,0.2);padding:1.1rem 1.2rem;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+                        <span style="font-size:1.3rem;">🧊</span>
+                        <h4 style="font-size:0.9rem;font-weight:600;color:#7c83f7;">3D Model Viewer</h4>
+                        <span class="tag tag-purple" style="font-size:0.65rem;margin-left:auto;">ModelViewer.jsx</span>
+                    </div>
+                    <p style="font-size:0.82rem;color:#9bbfd8;line-height:1.5;">Perspective Three.js canvas with orbit + place-pin modes. GLTFLoader with Draco decoder. Stores precise <span class="mono" style="color:#7c83f7;">worldX/Y/Z</span> in metres — maps directly to AR world space after Z-negation.</p>
+                </div>
+                <div class="glass-card reveal" style="padding:0.9rem 1.1rem;">
+                    <p style="font-size:0.8rem;color:#9bbfd8;"><strong style="color:#e8f4fd;">Routes:</strong> <span class="mono" style="color:#4fc3f7;">/login</span> · <span class="mono" style="color:#4fc3f7;">/</span> (dashboard) · <span class="mono" style="color:#4fc3f7;">/properties/:id/edit</span><br/>
+                    <strong style="color:#e8f4fd;">Auth:</strong> userId stored in localStorage, sent as <span class="mono" style="color:#4fc3f7;">Bearer user-1 / user-2</span></p>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div class="glass-card reveal" style="padding:1.1rem 1.2rem;height:100%;">
+                    <div class="section-label" style="margin-bottom:0.8rem;">Stack</div>
+                    <div style="display:flex;flex-direction:column;gap:0.6rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(79,195,247,0.08);padding-bottom:0.5rem;">
+                            <span style="font-size:0.82rem;color:#e8f4fd;">React</span><span class="tag" style="font-size:0.65rem;">18</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(79,195,247,0.08);padding-bottom:0.5rem;">
+                            <span style="font-size:0.82rem;color:#e8f4fd;">Vite</span><span class="tag" style="font-size:0.65rem;">8</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(79,195,247,0.08);padding-bottom:0.5rem;">
+                            <span style="font-size:0.82rem;color:#e8f4fd;">Three.js</span><span class="tag tag-purple" style="font-size:0.65rem;">r170</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(79,195,247,0.08);padding-bottom:0.5rem;">
+                            <span style="font-size:0.82rem;color:#e8f4fd;">TailwindCSS</span><span class="tag tag-cyan" style="font-size:0.65rem;">3</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(79,195,247,0.08);padding-bottom:0.5rem;">
+                            <span style="font-size:0.82rem;color:#e8f4fd;">Dev server</span><span class="tag" style="font-size:0.65rem;">localhost:5173</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.82rem;color:#e8f4fd;">API proxy</span><span class="tag" style="font-size:0.65rem;">/api → :3001</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 7: BACKEND API -->
+<div class="slide slide-7" data-slide="7">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:360px;height:360px;top:-60px;left:-50px;background:#26c6da;opacity:0.08;"></div>
+        <div class="blob" style="width:240px;height:240px;bottom:-50px;right:-30px;background:#4fc3f7;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="section-label reveal">Component 3</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.7rem,3.5vw,2.5rem);font-weight:700;margin-bottom:1.3rem;color:#e8f4fd;">Backend REST API</h2>
+        <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:1.3rem;align-items:start;">
+            <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                <div class="glass-card reveal" style="padding:0.9rem 1.1rem;">
+                    <div style="display:grid;grid-template-columns:auto 1fr;gap:0.3rem 0.8rem;align-items:center;">
+                        <span class="tag tag-cyan" style="font-size:0.65rem;">POST</span><span class="mono" style="font-size:0.78rem;color:#e8f4fd;">/api/auth/login</span>
+                        <span class="tag" style="font-size:0.65rem;">GET/POST</span><span class="mono" style="font-size:0.78rem;color:#e8f4fd;">/api/properties</span>
+                        <span class="tag tag-purple" style="font-size:0.65rem;">POST</span><span class="mono" style="font-size:0.78rem;color:#e8f4fd;">/api/properties/:id/floor-plan</span>
+                        <span class="tag tag-purple" style="font-size:0.65rem;">POST</span><span class="mono" style="font-size:0.78rem;color:#e8f4fd;">/api/properties/:id/model</span>
+                        <span class="tag" style="font-size:0.65rem;">GET/POST</span><span class="mono" style="font-size:0.78rem;color:#e8f4fd;">/api/properties/:id/annotations</span>
+                        <span class="tag tag-cyan" style="font-size:0.65rem;">PUT/DEL</span><span class="mono" style="font-size:0.78rem;color:#e8f4fd;">/api/annotations/:id</span>
+                        <span class="tag" style="font-size:0.65rem;">POST/GET</span><span class="mono" style="font-size:0.78rem;color:#e8f4fd;">/api/anchors</span>
+                        <span class="tag tag-purple" style="font-size:0.65rem;">POST</span><span class="mono" style="font-size:0.78rem;color:#e8f4fd;">/api/sessions</span>
+                    </div>
+                </div>
+                <div class="glass-card accent-border reveal" style="padding:0.9rem 1.1rem;">
+                    <div class="section-label" style="margin-bottom:0.4rem;">Database Schema</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <span class="tag">Property</span><span class="tag tag-purple">Annotation</span><span class="tag tag-cyan">CloudAnchor</span><span class="tag">Session</span>
+                    </div>
+                    <p style="font-size:0.78rem;color:#9bbfd8;margin-top:0.5rem;">Annotation stores both <span class="mono" style="color:#4fc3f7;">floorX/Y</span> (2D) and <span class="mono" style="color:#7c83f7;">worldX/Y/Z</span> (3D) coordinates.</p>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                <div class="glass-card reveal" style="padding:1rem 1.1rem;">
+                    <div class="section-label" style="margin-bottom:0.5rem;">Stack</div>
+                    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                        <div style="display:flex;justify-content:space-between;"><span style="font-size:0.82rem;color:#e8f4fd;">Express</span><span class="tag" style="font-size:0.65rem;">4</span></div>
+                        <div style="display:flex;justify-content:space-between;"><span style="font-size:0.82rem;color:#e8f4fd;">Prisma</span><span class="tag tag-purple" style="font-size:0.65rem;">5</span></div>
+                        <div style="display:flex;justify-content:space-between;"><span style="font-size:0.82rem;color:#e8f4fd;">PostgreSQL</span><span class="tag tag-cyan" style="font-size:0.65rem;">16</span></div>
+                        <div style="display:flex;justify-content:space-between;"><span style="font-size:0.82rem;color:#e8f4fd;">multer</span><span class="tag" style="font-size:0.65rem;">2</span></div>
+                        <div style="display:flex;justify-content:space-between;"><span style="font-size:0.82rem;color:#e8f4fd;">Port</span><span class="tag" style="font-size:0.65rem;">localhost:3001</span></div>
+                    </div>
+                </div>
+                <div class="glass-card reveal" style="padding:1rem 1.1rem;border-color:rgba(38,198,218,0.2);">
+                    <div class="section-label" style="margin-bottom:0.4rem;">File Storage</div>
+                    <p style="font-size:0.8rem;color:#9bbfd8;line-height:1.5;">Floor plans &amp; 3D models stored in <span class="mono" style="color:#26c6da;">backend/uploads/</span>. Served via Express static middleware. No cloud storage — fully local. 100 MB upload limit.</p>
+                </div>
+                <div class="glass-card reveal" style="padding:0.9rem 1.1rem;">
+                    <div class="section-label" style="margin-bottom:0.4rem;">Auth Middleware</div>
+                    <p style="font-size:0.8rem;color:#9bbfd8;"><span class="mono" style="color:#4fc3f7;">requireHost</span> · <span class="mono" style="color:#4fc3f7;">requireGuest</span> · <span class="mono" style="color:#4fc3f7;">requireHostOrGuest</span><br/>Bearer token: <span class="mono" style="color:#4fc3f7;">user-1</span> or <span class="mono" style="color:#4fc3f7;">user-2</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 8: ARCHITECTURE / DATA FLOW -->
+<div class="slide slide-8" data-slide="8">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:420px;height:420px;top:-80px;right:-80px;background:#4fc3f7;opacity:0.1;"></div>
+        <div class="blob" style="width:260px;height:260px;bottom:-60px;left:-40px;background:#7c83f7;opacity:0.08;"></div>
+    </div>
+    <canvas class="particle-canvas-ambient" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content">
+        <div class="section-label reveal">System Architecture</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.7rem,3.5vw,2.5rem);font-weight:700;margin-bottom:1.5rem;color:#e8f4fd;">End-to-End Data Flow</h2>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0.8rem;align-items:center;margin-bottom:1.3rem;">
+            <div class="glass-card reveal" style="text-align:center;padding:1.1rem 0.8rem;border-color:rgba(124,131,247,0.25);">
+                <div style="font-size:1.8rem;margin-bottom:0.4rem;">🧑‍💻</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#7c83f7;margin-bottom:0.3rem;">Host Browser</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">React Dashboard<br/>Three.js Editor</div>
+            </div>
+            <div class="flow-arrow reveal" style="font-size:1.2rem;text-align:center;">→</div>
+            <div class="glass-card reveal" style="text-align:center;padding:1.1rem 0.8rem;border-color:rgba(79,195,247,0.25);">
+                <div style="font-size:1.8rem;margin-bottom:0.4rem;">⚙️</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#4fc3f7;margin-bottom:0.3rem;">Node.js API</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">Express + Prisma<br/>localhost:3001</div>
+            </div>
+            <div class="flow-arrow reveal" style="font-size:1.2rem;text-align:center;">→</div>
+            <div class="glass-card reveal" style="text-align:center;padding:1.1rem 0.8rem;border-color:rgba(38,198,218,0.25);">
+                <div style="font-size:1.8rem;margin-bottom:0.4rem;">🗄️</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#26c6da;margin-bottom:0.3rem;">PostgreSQL</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">Annotations<br/>Anchors · Sessions</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0.8rem;align-items:center;">
+            <div class="glass-card reveal" style="text-align:center;padding:1.1rem 0.8rem;border-color:rgba(79,195,247,0.25);">
+                <div style="font-size:1.8rem;margin-bottom:0.4rem;">📱</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#4fc3f7;margin-bottom:0.3rem;">Guest Unity App</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">Samsung S25 Ultra<br/>Android 15, ARCore</div>
+            </div>
+            <div class="flow-arrow reveal" style="font-size:1.2rem;text-align:center;">→</div>
+            <div class="glass-card reveal" style="text-align:center;padding:1.1rem 0.8rem;border-color:rgba(79,195,247,0.25);">
+                <div style="font-size:1.8rem;margin-bottom:0.4rem;">⚙️</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#4fc3f7;margin-bottom:0.3rem;">REST API</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">adb reverse tcp:3001<br/>USB tunnel</div>
+            </div>
+            <div class="flow-arrow reveal" style="font-size:1.2rem;text-align:center;">→</div>
+            <div class="glass-card reveal" style="text-align:center;padding:1.1rem 0.8rem;border-color:rgba(38,198,218,0.25);">
+                <div style="font-size:1.8rem;margin-bottom:0.4rem;">☁️</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#26c6da;margin-bottom:0.3rem;">Google Cloud</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">ARCore Extensions<br/>Anchor resolution</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 9: KEY DECISIONS -->
+<div class="slide slide-9" data-slide="9">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:380px;height:380px;top:-70px;left:-60px;background:#4fc3f7;opacity:0.09;"></div>
+        <div class="blob" style="width:240px;height:240px;bottom:-50px;right:-30px;background:#26c6da;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="section-label reveal">Design Rationale</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.7rem,3.5vw,2.5rem);font-weight:700;margin-bottom:1.3rem;color:#e8f4fd;">Key Architectural Decisions</h2>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+            <div class="glass-card accent-border reveal" style="padding:0.9rem 1.2rem;display:flex;gap:1rem;align-items:flex-start;">
+                <span style="font-size:1.3rem;flex-shrink:0;">🔒</span>
+                <div><h4 style="font-size:0.9rem;font-weight:600;color:#4fc3f7;margin-bottom:0.2rem;">No Cloud Services (except Google Cloud Anchors)</h4><p style="font-size:0.8rem;color:#9bbfd8;">Auth and file storage are fully local. Supabase has been removed entirely. Keeps stack simple and offline-capable.</p></div>
+            </div>
+            <div class="glass-card reveal" style="border-left:3px solid #7c83f7;padding:0.9rem 1.2rem;display:flex;gap:1rem;align-items:flex-start;">
+                <span style="font-size:1.3rem;flex-shrink:0;">🎯</span>
+                <div><h4 style="font-size:0.9rem;font-weight:600;color:#7c83f7;margin-bottom:0.2rem;">Markerless ARCore SLAM Only</h4><p style="font-size:0.8rem;color:#9bbfd8;">No image targets or QR codes. Pure environment-based tracking for a seamless guest experience — no physical setup required.</p></div>
+            </div>
+            <div class="glass-card reveal" style="border-left:3px solid #26c6da;padding:0.9rem 1.2rem;display:flex;gap:1rem;align-items:flex-start;">
+                <span style="font-size:1.3rem;flex-shrink:0;">📐</span>
+                <div><h4 style="font-size:0.9rem;font-weight:600;color:#26c6da;margin-bottom:0.2rem;">3D Model for Precise Annotation Placement</h4><p style="font-size:0.8rem;color:#9bbfd8;">Hosts place annotations in a 3D model viewer. Coordinates map directly to AR world space (after Z-negation) — far more accurate than 2D-only floor plan clicks.</p></div>
+            </div>
+            <div class="glass-card reveal" style="border-left:3px solid #4fc3f7;padding:0.9rem 1.2rem;display:flex;gap:1rem;align-items:flex-start;">
+                <span style="font-size:1.3rem;flex-shrink:0;">🎨</span>
+                <div><h4 style="font-size:0.9rem;font-weight:600;color:#4fc3f7;margin-bottom:0.2rem;">No Canvas/UGUI in AR (World-Space Only)</h4><p style="font-size:0.8rem;color:#9bbfd8;">World Space Canvas does not render reliably in Unity 6 URP AR. Annotation panels are built as Quad + 3D TMP labels with URP-compatible materials, entirely in code.</p></div>
+            </div>
+            <div class="glass-card reveal" style="border-left:3px solid #7c83f7;padding:0.9rem 1.2rem;display:flex;gap:1rem;align-items:flex-start;">
+                <span style="font-size:1.3rem;flex-shrink:0;">📡</span>
+                <div><h4 style="font-size:0.9rem;font-weight:600;color:#7c83f7;margin-bottom:0.2rem;">LiDAR Is Enhancement Only</h4><p style="font-size:0.8rem;color:#9bbfd8;">Samsung S25 Ultra has no LiDAR. All base features work without a depth sensor — LiDAR support is a future enhancement path, not a dependency.</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 10: TECH SNAPSHOT -->
+<div class="slide slide-10" data-slide="10">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:400px;height:400px;top:-80px;right:-70px;background:#4fc3f7;opacity:0.1;"></div>
+        <div class="blob" style="width:260px;height:260px;bottom:-60px;left:-40px;background:#7c83f7;opacity:0.08;"></div>
+        <div class="blob" style="width:180px;height:180px;top:40%;left:10%;background:#26c6da;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="section-label reveal">System Summary</div>
+        <h2 class="font-display reveal" style="font-size:clamp(1.7rem,3.5vw,2.5rem);font-weight:700;margin-bottom:1.3rem;color:#e8f4fd;">Full Stack Snapshot</h2>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.2rem;">
+            <div class="glass-card reveal" style="text-align:center;padding:1rem 0.8rem;">
+                <div style="font-size:2rem;font-weight:800;color:#4fc3f7;" class="stat-glow">3</div>
+                <div style="font-size:0.75rem;color:#9bbfd8;text-transform:uppercase;letter-spacing:0.1em;margin-top:0.3rem;">Components</div>
+                <div style="font-size:0.7rem;color:#5a8aaa;margin-top:0.2rem;">AR · Backend · Dashboard</div>
+            </div>
+            <div class="glass-card reveal" style="text-align:center;padding:1rem 0.8rem;border-color:rgba(124,131,247,0.2);">
+                <div style="font-size:2rem;font-weight:800;color:#7c83f7;" class="stat-glow">6</div>
+                <div style="font-size:0.75rem;color:#9bbfd8;text-transform:uppercase;letter-spacing:0.1em;margin-top:0.3rem;">Unity Version</div>
+                <div style="font-size:0.7rem;color:#5a8aaa;margin-top:0.2rem;">AR Foundation 6.4.1</div>
+            </div>
+            <div class="glass-card reveal" style="text-align:center;padding:1rem 0.8rem;border-color:rgba(38,198,218,0.2);">
+                <div style="font-size:2rem;font-weight:800;color:#26c6da;" class="stat-glow">16+</div>
+                <div style="font-size:0.75rem;color:#9bbfd8;text-transform:uppercase;letter-spacing:0.1em;margin-top:0.3rem;">API Endpoints</div>
+                <div style="font-size:0.7rem;color:#5a8aaa;margin-top:0.2rem;">REST · CRUD · Sessions</div>
+            </div>
+            <div class="glass-card reveal" style="text-align:center;padding:1rem 0.8rem;">
+                <div style="font-size:2rem;font-weight:800;color:#4fc3f7;" class="stat-glow">4</div>
+                <div style="font-size:0.75rem;color:#9bbfd8;text-transform:uppercase;letter-spacing:0.1em;margin-top:0.3rem;">DB Entities</div>
+                <div style="font-size:0.7rem;color:#5a8aaa;margin-top:0.2rem;">Prisma · PostgreSQL 16</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">
+            <div class="glass-card reveal" style="padding:1rem;border-color:rgba(79,195,247,0.2);">
+                <div style="font-size:0.72rem;font-family:'Space Mono',monospace;color:#4fc3f7;margin-bottom:0.5rem;">AR APP</div>
+                <div style="font-size:0.78rem;color:#9bbfd8;line-height:1.7;">Unity 6 · AR Foundation<br/>ARCore XR Plugin<br/>URP Performant<br/>XR Interaction Toolkit<br/>IL2CPP · ARM64 · Android 15</div>
+            </div>
+            <div class="glass-card reveal" style="padding:1rem;border-color:rgba(124,131,247,0.2);">
+                <div style="font-size:0.72rem;font-family:'Space Mono',monospace;color:#7c83f7;margin-bottom:0.5rem;">BACKEND</div>
+                <div style="font-size:0.78rem;color:#9bbfd8;line-height:1.7;">Node.js · Express 4<br/>Prisma 5 · PostgreSQL 16<br/>multer 2 · Jest<br/>nodemon · Windows 11<br/>No Docker required</div>
+            </div>
+            <div class="glass-card reveal" style="padding:1rem;border-color:rgba(38,198,218,0.2);">
+                <div style="font-size:0.72rem;font-family:'Space Mono',monospace;color:#26c6da;margin-bottom:0.5rem;">DASHBOARD</div>
+                <div style="font-size:0.78rem;color:#9bbfd8;line-height:1.7;">React 18 · Vite 8<br/>Three.js r170 · Draco<br/>TailwindCSS 3 · Vitest 3<br/>GLTFLoader · GLB/GLTF<br/>localStorage auth</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 11: CLOSING -->
+<div class="slide slide-11" data-slide="11">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:520px;height:520px;top:-110px;right:-100px;background:#4fc3f7;opacity:0.14;"></div>
+        <div class="blob" style="width:340px;height:340px;bottom:-90px;left:-70px;background:#7c83f7;opacity:0.12;"></div>
+        <div class="blob" style="width:220px;height:220px;top:40%;left:10%;background:#26c6da;opacity:0.1;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <div style="font-size:80px;margin-bottom:1rem;animation:float 3.5s ease-in-out infinite;" class="reveal">🏠</div>
+        <h1 class="font-display reveal" style="font-size:clamp(2.5rem,6vw,4.5rem);font-weight:800;background:linear-gradient(135deg,#4fc3f7,#7c83f7,#26c6da);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-0.02em;margin-bottom:0.8rem;">Thank You</h1>
+        <p class="reveal" style="color:#9bbfd8;font-size:1rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:1.8rem;">Team Musashi · Trinity College Dublin</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;max-width:700px;margin:0 auto;" class="reveal">
+            <div class="glass-card" style="text-align:center;padding:1rem 0.8rem;">
+                <div style="font-size:1.5rem;margin-bottom:0.4rem;">📱</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#4fc3f7;">AR App</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">Unity 6 · ARCore</div>
+            </div>
+            <div class="glass-card" style="text-align:center;padding:1rem 0.8rem;border-color:rgba(124,131,247,0.2);">
+                <div style="font-size:1.5rem;margin-bottom:0.4rem;">⚙️</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#7c83f7;">Backend</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">Node.js · PostgreSQL</div>
+            </div>
+            <div class="glass-card" style="text-align:center;padding:1rem 0.8rem;border-color:rgba(38,198,218,0.2);">
+                <div style="font-size:1.5rem;margin-bottom:0.4rem;">🖥️</div>
+                <div style="font-size:0.8rem;font-weight:600;color:#26c6da;">Dashboard</div>
+                <div style="font-size:0.72rem;color:#9bbfd8;">React · Three.js</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div><!-- /deck -->
+
+<div class="nav-controls">
+    <button class="nav-btn" onclick="changeSlide(-1)">&#8249;</button>
+    <div class="slide-dots" id="dots"></div>
+    <button class="nav-btn" onclick="changeSlide(1)">&#8250;</button>
+    <span class="slide-counter" id="counter">1 / 11</span>
+</div>
+
+<script>
+    let current = 1;
+    const total = document.querySelectorAll('.slide').length;
+    const dotsContainer = document.getElementById('dots');
+    const counter = document.getElementById('counter');
+    for (let i = 1; i <= total; i++) { const dot = document.createElement('div'); dot.className = 'dot' + (i === 1 ? ' active' : ''); dot.onclick = () => goToSlide(i); dotsContainer.appendChild(dot); }
+    counter.textContent = '1 / ' + total;
+    function goToSlide(n) {
+        const prev = document.querySelector('.slide.active');
+        const next = document.querySelector('.slide[data-slide="' + n + '"]');
+        if (prev) prev.classList.remove('active');
+        if (next) { next.classList.add('active'); animateSlide(next); }
+        current = n; updateNav();
+    }
+    function changeSlide(dir) { let n = current + dir; if (n < 1) n = total; if (n > total) n = 1; goToSlide(n); }
+    function updateNav() { document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === current)); counter.textContent = current + ' / ' + total; }
+    document.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); } if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); } });
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+    document.addEventListener('touchend', (e) => { const diff = touchStartX - e.changedTouches[0].clientX; if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1); });
+
+    function animateSlide(slide) {
+        slide.querySelectorAll('.reveal').forEach((el, i) => {
+            el.style.transition = 'none'; el.style.opacity = '0'; el.style.transform = 'translateY(18px)';
+            el.offsetHeight;
+            const delay = i * 0.07;
+            el.style.transition = 'opacity 0.35s ease ' + delay + 's, transform 0.35s ease ' + delay + 's';
+            el.style.opacity = '1'; el.style.transform = 'translateY(0px)';
+        });
+    }
+
+    document.addEventListener('mousemove', (e) => {
+        const s = document.querySelector('.mouse-spotlight');
+        if (s) s.style.background = 'radial-gradient(600px circle at ' + e.clientX + 'px ' + e.clientY + 'px, rgba(79,195,247,0.06), transparent 40%)';
+    });
+
+    window.initParticles = function(canvas, opts) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth || window.innerWidth;
+        canvas.height = canvas.offsetHeight || window.innerHeight;
+        const count = opts.count || 40;
+        const interactive = opts.interactive !== false;
+        let mx = -1000, my = -1000;
+        const particles = Array.from({length: count}, () => ({
+            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+            size: Math.random() * 2.2 + 0.7, alpha: Math.random() * 0.3 + 0.08
+        }));
+        if (interactive) { canvas.addEventListener('mousemove', (e) => { const r = canvas.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; }); }
+        (function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                if (interactive) { const dx = p.x - mx, dy = p.y - my, d = Math.sqrt(dx*dx+dy*dy); if (d < 110) { const f = (110-d)/110*1.8; p.vx += dx/d*f*0.1; p.vy += dy/d*f*0.1; } }
+                p.vx *= 0.98; p.vy *= 0.98; p.x += p.vx; p.y += p.vy;
+                if (p.x < 0) p.x = canvas.width; if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height; if (p.y > canvas.height) p.y = 0;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(79,195,247,' + p.alpha + ')'; ctx.fill();
+            });
+            requestAnimationFrame(animate);
+        })();
+    };
+    document.querySelectorAll('.particle-canvas').forEach(c => initParticles(c, {interactive: true, count: 50}));
+    document.querySelectorAll('.particle-canvas-ambient').forEach(c => initParticles(c, {interactive: false, count: 18}));
+
+    try { animateSlide(document.querySelector('.slide.active')); } catch(e) {}
+</script>
+</body>
+</html>

@@ -4,24 +4,6 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-/**
- * ModelViewer
- * Renders a GLTF/GLB 3D model with pin placement support.
- *
- * Coordinate system: Three.js Y-up right-handed.
- * When consuming worldX/Y/Z in Unity (Y-up left-handed), negate Z:
- *   unityPos = new Vector3(worldX, worldY, -worldZ)
- *
- * Props:
- *   modelUrl      – public URL of the .glb / .gltf file
- *   pins          – [{ id, worldX, worldY, worldZ, title }]
- *   selectedPinId – currently selected pin id (or null)
- *   mode          – 'orbit' | 'place'
- *   onPlacePin    – (worldX, worldY, worldZ) => void
- *   onSelectPin   – (id) => void
- *   onLoadStart   – () => void  (optional)
- *   onLoadEnd     – () => void  (optional)
- */
 export default function ModelViewer({
   modelUrl,
   pins,
@@ -126,7 +108,7 @@ export default function ModelViewer({
       renderer.dispose();
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Load model when URL changes ───────────────────────────────────────────
   useEffect(() => {
@@ -151,8 +133,6 @@ export default function ModelViewer({
     }
     stateRef.current.modelMeshes = [];
 
-    // DRACOLoader handles Draco-compressed GLBs (Blender's default export).
-    // Decoder WASM files are served from /public/draco/ (copied from three/examples/jsm/libs/draco/).
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('/draco/');
 
@@ -207,9 +187,8 @@ export default function ModelViewer({
         onLoadEnd?.();
       }
     );
-  }, [modelUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [modelUrl]);
 
-  // ── Rebuild pin meshes ────────────────────────────────────────────────────
   const rebuildPins = useCallback(() => {
     const { pinGroup } = stateRef.current;
     if (!pinGroup) return;
@@ -255,7 +234,6 @@ export default function ModelViewer({
 
   useEffect(() => { rebuildPins(); }, [pins, selectedPinId, rebuildPins]);
 
-  // ── Sync OrbitControls enabled state with mode ────────────────────────────
   useEffect(() => {
     const { controls } = stateRef.current;
     if (!controls) return;
@@ -265,7 +243,6 @@ export default function ModelViewer({
     }
   }, [mode]);
 
-  // ── Pointer interaction ───────────────────────────────────────────────────
   function getNormPointer(e) {
     const rect = mountRef.current.getBoundingClientRect();
     return new THREE.Vector2(

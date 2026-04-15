@@ -3,18 +3,6 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { api } from '../lib/api';
 
-/**
- * Generates a flat horizontal GLB model from the property's floor plan image.
- * The host enters real-world dimensions; the component creates a PlaneGeometry
- * textured with the floor plan and uploads it as the property's 3D model.
- *
- * Coordinate layout of the generated plane (Three.js Y-up right-handed):
- *   - Width  → X axis
- *   - Depth  → Z axis
- *   - Y = 0  (floor level)
- * Annotation pins placed on this plane will have worldY ≈ 0 and map directly
- * to AR world space after the standard Z-negation.
- */
 export default function FloorPlanModelGenerator({ propertyId, floorPlanUrl, onModelReady }) {
   const [width, setWidth] = useState(10);
   const [depth, setDepth] = useState(8);
@@ -25,8 +13,6 @@ export default function FloorPlanModelGenerator({ propertyId, floorPlanUrl, onMo
     setGenerating(true);
     setError('');
     try {
-      // Convert absolute URL (http://localhost:3001/uploads/…) to a relative path
-      // so the request goes through the Vite proxy and avoids CORS.
       let imgPath = floorPlanUrl;
       try { imgPath = new URL(floorPlanUrl).pathname; } catch {}
 
@@ -41,9 +27,6 @@ export default function FloorPlanModelGenerator({ propertyId, floorPlanUrl, onMo
         new THREE.TextureLoader().load(objectUrl, resolve, undefined, reject);
       });
       texture.colorSpace = THREE.SRGBColorSpace;
-      // Keep flipY = true (default) — Three.js flips images to match WebGL convention,
-      // and GLTFExporter compensates the UVs automatically.
-
       // Build a horizontal plane lying on the XZ plane (Y = 0)
       const geometry = new THREE.PlaneGeometry(width, depth);
       const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });

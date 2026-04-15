@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="1000" height="620" font-family="'Segoe UI', Arial, sans-serif">
+
+  <!-- Background -->
+  <rect width="1000" height="620" fill="#0f1117"/>
+
+  <!-- Title -->
+  <text x="500" y="44" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700" letter-spacing="1">ARbnb — Key Technical Features</text>
+  <line x1="200" y1="54" x2="800" y2="54" stroke="#444" stroke-width="1"/>
+
+  <!-- ══════════════════════════════════════════════════
+       LEFT BOX — Host Dashboard
+  ═══════════════════════════════════════════════════ -->
+  <rect x="30" y="72" width="270" height="330" rx="12" fill="#1a1f2e" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="30" y="72" width="270" height="38" rx="12" fill="#4a6fa5"/>
+  <rect x="30" y="96" width="270" height="14" fill="#4a6fa5"/>
+  <text x="165" y="97" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Host Dashboard</text>
+  <text x="165" y="111" text-anchor="middle" fill="#c5d8f0" font-size="10">React 18 + Three.js r170 + Vite</text>
+
+  <!-- Dashboard features -->
+  <text x="50" y="138" fill="#7eb8f7" font-size="11" font-weight="700">2D FLOOR PLAN EDITOR</text>
+  <text x="50" y="154" fill="#aaaaaa" font-size="10">· Orthographic Three.js canvas</text>
+  <text x="50" y="168" fill="#aaaaaa" font-size="10">· Click-to-place pins (floorX/Y, 0–1 normalised)</text>
+
+  <line x1="50" y1="178" x2="280" y2="178" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="50" y="196" fill="#7eb8f7" font-size="11" font-weight="700">FLOOR PLAN → 3D MODEL</text>
+  <text x="50" y="212" fill="#aaaaaa" font-size="10">· PlaneGeometry(width, depth) in metres</text>
+  <text x="50" y="226" fill="#aaaaaa" font-size="10">· Rotated –90° → flat on XZ plane</text>
+  <text x="50" y="240" fill="#aaaaaa" font-size="10">· GLTFExporter → binary GLB upload</text>
+
+  <line x1="50" y1="250" x2="280" y2="250" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="50" y="268" fill="#7eb8f7" font-size="11" font-weight="700">3D MODEL VIEWER</text>
+  <text x="50" y="284" fill="#aaaaaa" font-size="10">· Perspective orbit + place-pin mode</text>
+  <text x="50" y="298" fill="#aaaaaa" font-size="10">· GLTFLoader + DRACOLoader</text>
+  <text x="50" y="312" fill="#aaaaaa" font-size="10">· worldX/Y/Z stored in metres</text>
+  <text x="50" y="326" fill="#aaaaaa" font-size="10">· Height (m) field per annotation</text>
+
+  <line x1="50" y1="336" x2="280" y2="336" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="50" y="354" fill="#7eb8f7" font-size="11" font-weight="700">AUTH</text>
+  <text x="50" y="370" fill="#aaaaaa" font-size="10">· Local only — no Supabase / cloud</text>
+  <text x="50" y="384" fill="#aaaaaa" font-size="10">· Bearer token in localStorage</text>
+
+  <!-- ══════════════════════════════════════════════════
+       CENTRE BOX — Backend
+  ═══════════════════════════════════════════════════ -->
+  <rect x="365" y="72" width="270" height="330" rx="12" fill="#1a1f2e" stroke="#6a9955" stroke-width="1.5"/>
+  <rect x="365" y="72" width="270" height="38" rx="12" fill="#3a6640"/>
+  <rect x="365" y="96" width="270" height="14" fill="#3a6640"/>
+  <text x="500" y="97" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Backend API</text>
+  <text x="500" y="111" text-anchor="middle" fill="#b5d8b0" font-size="10">Node.js / Express 4 + Prisma 5 + PostgreSQL 16</text>
+
+  <text x="385" y="138" fill="#7ec87e" font-size="11" font-weight="700">REST ENDPOINTS</text>
+  <text x="385" y="154" fill="#aaaaaa" font-size="10">· Properties, Annotations, Sessions</text>
+  <text x="385" y="168" fill="#aaaaaa" font-size="10">· Floor plan + 3D model upload (multer)</text>
+  <text x="385" y="182" fill="#aaaaaa" font-size="10">· Cloud Anchor ID store / fetch</text>
+
+  <line x1="385" y1="192" x2="615" y2="192" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="385" y="210" fill="#7ec87e" font-size="11" font-weight="700">DATABASE SCHEMA</text>
+  <text x="385" y="226" fill="#aaaaaa" font-size="10">· Property  ·  Annotation  ·  Session</text>
+  <text x="385" y="240" fill="#aaaaaa" font-size="10">· CloudAnchor (annotationId → cloudAnchorId)</text>
+  <text x="385" y="254" fill="#aaaaaa" font-size="10">· Annotation: floorX/Y + worldX/Y/Z</text>
+
+  <line x1="385" y1="264" x2="615" y2="264" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="385" y="282" fill="#7ec87e" font-size="11" font-weight="700">FILE STORAGE</text>
+  <text x="385" y="298" fill="#aaaaaa" font-size="10">· uploads/{userId}/{propertyId}/</text>
+  <text x="385" y="312" fill="#aaaaaa" font-size="10">· Served statically at GET /uploads/*</text>
+
+  <line x1="385" y1="322" x2="615" y2="322" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="385" y="340" fill="#7ec87e" font-size="11" font-weight="700">COORDINATE HANDEDNESS</text>
+  <text x="385" y="356" fill="#aaaaaa" font-size="10">· Three.js stores Y-up right-handed</text>
+  <text x="385" y="370" fill="#aaaaaa" font-size="10">· Unity reads: Vector3(x, y, –z)</text>
+  <text x="385" y="384" fill="#aaaaaa" font-size="10">· Y maps directly (both Y-up)</text>
+
+  <!-- ══════════════════════════════════════════════════
+       RIGHT BOX — AR App
+  ═══════════════════════════════════════════════════ -->
+  <rect x="700" y="72" width="270" height="330" rx="12" fill="#1a1f2e" stroke="#c57b3d" stroke-width="1.5"/>
+  <rect x="700" y="72" width="270" height="38" rx="12" fill="#7a4020"/>
+  <rect x="700" y="96" width="270" height="14" fill="#7a4020"/>
+  <text x="835" y="97" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">AR App (Guest)</text>
+  <text x="835" y="111" text-anchor="middle" fill="#f0c89a" font-size="10">Unity 6 · AR Foundation 6.4 · URP 17 · ARCore</text>
+
+  <text x="720" y="138" fill="#f0a060" font-size="11" font-weight="700">MARKERLESS AR TRACKING</text>
+  <text x="720" y="154" fill="#aaaaaa" font-size="10">· ARCore visual-inertial odometry (SLAM)</text>
+  <text x="720" y="168" fill="#aaaaaa" font-size="10">· No QR codes or image targets</text>
+  <text x="720" y="182" fill="#aaaaaa" font-size="10">· 6-DoF pose, gravity-aligned Y axis</text>
+
+  <line x1="720" y1="192" x2="950" y2="192" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="720" y="210" fill="#f0a060" font-size="11" font-weight="700">CLOUD ANCHOR PERSISTENCE</text>
+  <text x="720" y="226" fill="#aaaaaa" font-size="10">· Guest 1: hosts anchor → saves ID to DB</text>
+  <text x="720" y="240" fill="#aaaaaa" font-size="10">· Guest 2+: resolves ID → snaps panels</text>
+  <text x="720" y="254" fill="#aaaaaa" font-size="10">· Visual feature map stored by Google</text>
+
+  <line x1="720" y1="264" x2="950" y2="264" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="720" y="282" fill="#f0a060" font-size="11" font-weight="700">ANNOTATION PANELS (URP)</text>
+  <text x="720" y="298" fill="#aaaaaa" font-size="10">· 3D Quad mesh + TextMeshPro 3D</text>
+  <text x="720" y="312" fill="#aaaaaa" font-size="10">· No Canvas/UGUI — URP compatible</text>
+  <text x="720" y="326" fill="#aaaaaa" font-size="10">· Billboard: always faces camera</text>
+
+  <line x1="720" y1="336" x2="950" y2="336" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="720" y="354" fill="#f0a060" font-size="11" font-weight="700">PROXIMITY CULLING</text>
+  <text x="720" y="370" fill="#aaaaaa" font-size="10">· Max 3 panels visible at once</text>
+  <text x="720" y="384" fill="#aaaaaa" font-size="10">· Distance-sorted — nearest shown</text>
+
+  <!-- ══════════════════════════════════════════════════
+       ARROWS between boxes
+  ═══════════════════════════════════════════════════ -->
+
+  <!-- Dashboard → Backend -->
+  <line x1="300" y1="237" x2="365" y2="237" stroke="#555" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <polygon points="363,233 372,237 363,241" fill="#555"/>
+  <text x="332" y="230" text-anchor="middle" fill="#666" font-size="9">REST API</text>
+
+  <!-- Backend → AR App -->
+  <line x1="635" y1="237" x2="700" y2="237" stroke="#555" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <polygon points="698,233 707,237 698,241" fill="#555"/>
+  <text x="667" y="230" text-anchor="middle" fill="#666" font-size="9">REST API</text>
+
+  <!-- ══════════════════════════════════════════════════
+       BOTTOM ROW — Cloud Anchors + Data flow callout
+  ═══════════════════════════════════════════════════ -->
+
+  <!-- Cloud Anchor flow box -->
+  <rect x="30" y="430" width="460" height="110" rx="10" fill="#131824" stroke="#5a4a7a" stroke-width="1.5"/>
+  <rect x="30" y="430" width="460" height="28" rx="10" fill="#2e2040"/>
+  <rect x="30" y="444" width="460" height="14" fill="#2e2040"/>
+  <text x="260" y="449" text-anchor="middle" fill="#c5a8f0" font-size="12" font-weight="700">Google Cloud Anchors — Cross-Session Persistence</text>
+
+  <text x="50" y="476" fill="#aaaaaa" font-size="10">Guest 1 (first visit)</text>
+  <text x="50" y="491" fill="#888" font-size="10">Panels spawn at raw worldX/Y/Z  →  ARCore captures visual features  →  uploads to Google  →  cloudAnchorId saved to DB</text>
+
+  <line x1="50" y1="500" x2="470" y2="500" stroke="#2a3040" stroke-width="1"/>
+
+  <text x="50" y="516" fill="#aaaaaa" font-size="10">Guest 2+ (subsequent visits)</text>
+  <text x="50" y="531" fill="#888" font-size="10">Panels spawn at raw positions  →  ARCore matches features  →  resolves anchor  →  panels snap to real-world position</text>
+
+  <!-- Coord system box -->
+  <rect x="510" y="430" width="460" height="110" rx="10" fill="#131824" stroke="#3a5a3a" stroke-width="1.5"/>
+  <rect x="510" y="430" width="460" height="28" rx="10" fill="#1e3020"/>
+  <rect x="510" y="444" width="460" height="14" fill="#1e3020"/>
+  <text x="740" y="449" text-anchor="middle" fill="#90d090" font-size="12" font-weight="700">Annotation Authoring → AR Pipeline</text>
+
+  <text x="530" y="474" fill="#aaaaaa" font-size="10">Host places pin in 3D viewer</text>
+  <rect x="530" y="480" width="90" height="18" rx="4" fill="#1a2a40"/>
+  <text x="575" y="493" text-anchor="middle" fill="#7eb8f7" font-size="10">worldX/Y/Z</text>
+  <text x="630" y="493" fill="#666" font-size="10">stored in DB</text>
+
+  <text x="530" y="516" fill="#aaaaaa" font-size="10">Unity AR app reads annotation</text>
+  <rect x="530" y="522" width="160" height="18" rx="4" fill="#1a2a40"/>
+  <text x="610" y="535" text-anchor="middle" fill="#f0a060" font-size="10">Vector3(x, y, –z)  →  panel spawns</text>
+
+  <!-- Footer -->
+  <text x="500" y="590" text-anchor="middle" fill="#444" font-size="10">Samsung Galaxy S25 Ultra · Android 15 · ARCore · Trinity College Dublin — Team Musashi</text>
+
+</svg>

@@ -1,21 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 
-/**
- * FloorPlanEditor
- * Renders the floor plan image on a Three.js orthographic scene.
- * Click anywhere on the image to place a pin.
- * Click an existing pin to select it.
- * Drag a selected pin to move it.
- *
- * Props:
- *   floorPlanUrl  – image URL to display as background
- *   pins          – [{ id, floorX, floorY, title }]
- *   selectedPinId – currently selected pin id (or null)
- *   onPlacePin    – (floorX, floorY) => void  – called on empty-space click
- *   onSelectPin   – (id) => void
- *   onMovePin     – (id, floorX, floorY) => void
- */
 export default function FloorPlanEditor({
   floorPlanUrl,
   pins,
@@ -92,8 +77,7 @@ export default function FloorPlanEditor({
       renderer.dispose();
       el.removeChild(renderer.domElement);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, []); 
   // ── Load floor plan texture when URL changes ──────────────────────────────
   useEffect(() => {
     const { planeMesh } = stateRef.current;
