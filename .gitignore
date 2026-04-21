@@ -35,3 +35,6 @@ AR app/**/*.userprefs
 .DS_Store
 Thumbs.db
 desktop.ini
+/code
+project-final.zip
+*.mp4
